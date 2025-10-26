@@ -391,7 +391,7 @@ function sendEmailNotification(recipient, messageText) {
     
     // Используем EmailJS для отправки email
     if (typeof emailjs !== 'undefined') {
-        emailjs.send('service_t3uwe48', 'template_7ppymg8', emailParams)
+        emailjs.send('service_lebtcym', 'template_7ppymg8', emailParams)
             .then(function(response) {
                 console.log('Email уведомление отправлено!', response.status, response.text);
             }, function(error) {
