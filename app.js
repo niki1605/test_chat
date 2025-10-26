@@ -18,7 +18,6 @@ let currentUser = null;
 let selectedChatUser = null;
 let messagesListener = null;
 let usersListener = null;
-let typingListener = null;
 let lastMessageQuery = null;
 
 // Переключение между вкладками
@@ -33,7 +32,7 @@ registerTab.addEventListener('click', () => {
     registerTab.classList.add('active');
     loginTab.classList.remove('active');
     registerForm.classList.add('active');
-    loginForm.classList.remove('active');
+    registerForm.classList.remove('active');
 });
 
 // Обработка формы регистрации
@@ -54,7 +53,8 @@ document.getElementById('registerForm').addEventListener('submit', (e) => {
                 email: email,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
-                online: true
+                online: true,
+                emailNotifications: true // Включение уведомлений по умолчанию
             });
         })
         .then(() => {
@@ -298,7 +298,7 @@ function displayMessage(message) {
         minute: '2-digit'
     }) : 'только что';
     
-    // Определяем статус сообщения
+    // Определяем статус сообщения с белыми иконками
     let statusIcon = '⏰'; // отправлено
     let statusText = 'Отправлено';
     
@@ -329,7 +329,7 @@ function displayMessage(message) {
     messagesContainer.appendChild(messageElement);
 }
 
-// Отправка сообщения
+// Отправка сообщения с уведомлением на email
 function sendMessage() {
     if (!selectedChatUser || !messageInput.value.trim()) return;
     
@@ -353,6 +353,9 @@ function sendMessage() {
         .then((docRef) => {
             messageInput.value = '';
             
+            // Отправка email уведомления
+            sendEmailNotification(selectedChatUser, messageText);
+            
             // Помечаем сообщение как доставленное
             setTimeout(() => {
                 db.collection('chats')
@@ -370,6 +373,54 @@ function sendMessage() {
         .catch((error) => {
             console.error('Ошибка отправки сообщения:', error);
         });
+}
+
+// Отправка уведомления на email
+function sendEmailNotification(recipient, messageText) {
+    // Здесь используется EmailJS - бесплатный сервис для отправки email
+    // Зарегистрируйтесь на https://www.emailjs.com/ и получите свои ключи
+    
+    const emailParams = {
+        to_email: recipient.email,
+        to_name: recipient.name,
+        from_name: currentUser.name,
+        message: messageText,
+        app_name: "SAS Messenger",
+        reply_to: currentUser.email
+    };
+    
+    // Используем EmailJS для отправки email
+    if (typeof emailjs !== 'undefined') {
+        emailjs.send('service_t3uwe48', 'template_7ppymg8', emailParams)
+            .then(function(response) {
+                console.log('Email уведомление отправлено!', response.status, response.text);
+            }, function(error) {
+                console.log('Ошибка отправки email:', error);
+                // Fallback: используем простой mailto ссылку
+                sendFallbackEmail(recipient, messageText);
+            });
+    } else {
+        // Fallback метод
+        sendFallbackEmail(recipient, messageText);
+    }
+}
+
+// Fallback метод отправки email (открывает почтовый клиент)
+function sendFallbackEmail(recipient, messageText) {
+    const subject = `SAS Messenger: Новое сообщение от ${currentUser.name}`;
+    const body = `Здравствуйте, ${recipient.name}!
+
+Вам пришло новое сообщение в SAS Messenger от ${currentUser.name}:
+
+"${messageText}"
+
+Чтобы ответить на сообщение, перейдите в приложение SAS Messenger.
+
+С уважением,
+SAS Messenger Team`;
+    
+    const mailtoLink = `mailto:${recipient.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoLink, '_blank');
 }
 
 // Пометить сообщения как прочитанные
@@ -489,7 +540,7 @@ auth.onAuthStateChanged((user) => {
                                 }
                             });
                         }
-                    }, 5000); // Проверка каждые 5 секунд
+                    }, 5000);
                 }
             });
     } else {
