@@ -397,7 +397,7 @@ function sendEmailNotification(recipient, messageText) {
             }, function(error) {
                 console.log('Ошибка отправки email:', error);
                 // Fallback: используем простой mailto ссылку
-                sendFallbackEmail(recipient, messageText);
+                //sendFallbackEmail(recipient, messageText);
             });
     } else {
         // Fallback метод
