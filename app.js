@@ -375,6 +375,7 @@ function sendMessage() {
         });
 }
 
+
 // Отправка уведомления на email
 function sendEmailNotification(recipient, messageText) {
     // Здесь используется EmailJS - бесплатный сервис для отправки email
@@ -401,7 +402,7 @@ function sendEmailNotification(recipient, messageText) {
             });
     } else {
         // Fallback метод
-        sendFallbackEmail(recipient, messageText);
+        //sendFallbackEmail(recipient, messageText);
     }
 }
 
