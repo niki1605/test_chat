@@ -150,7 +150,7 @@ button:disabled {
 .main-app {
     display: grid;
     grid-template-columns: 300px 1fr;
-    grid-template-rows: 60px 1fr;
+    grid-template-rows: 60px 1fr auto; /* Изменено: добавлен auto для поля ввода */
     height: 100%;
     gap: 1px;
     background-color: #f0f0f0;
@@ -164,6 +164,7 @@ button:disabled {
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    z-index: 10;
 }
 
 .user-info {
@@ -182,6 +183,7 @@ button:disabled {
     background: white;
     padding: 20px;
     overflow-y: auto;
+    grid-row: 2 / 4; /* Занимает обе строки */
 }
 
 .users-panel h3 {
@@ -227,27 +229,33 @@ button:disabled {
     background: #95a5a6;
 }
 
+/* Область чата - переработана для фиксированного поля ввода */
 .chat-area {
     background: white;
     display: flex;
     flex-direction: column;
+    height: 100%;
+    grid-row: 2 / 4; /* Занимает обе строки */
 }
 
 .chat-header {
     padding: 15px 20px;
     background: #f8f9fa;
     border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0; /* Запрещаем сжиматься */
 }
 
 .chat-header h3 {
     color: #333;
+    margin: 0;
 }
 
 .messages-container {
-    flex: 1;
+    flex: 1; /* Занимает всё доступное пространство */
     padding: 20px;
     overflow-y: auto;
     background: #fafafa;
+    min-height: 0; /* Важно для правильного flexbox поведения */
 }
 
 .message-item {
@@ -256,6 +264,18 @@ button:disabled {
     border-radius: 12px;
     max-width: 70%;
     word-wrap: break-word;
+    animation: messageAppear 0.3s ease;
+}
+
+@keyframes messageAppear {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .message-item.own {
@@ -281,6 +301,7 @@ button:disabled {
 
 .message-text {
     font-size: 14px;
+    line-height: 1.4;
 }
 
 .message-time {
@@ -290,21 +311,45 @@ button:disabled {
     opacity: 0.7;
 }
 
+/* Контейнер для ввода сообщения - всегда видим */
 .message-input-container {
     padding: 20px;
     background: #f8f9fa;
     border-top: 1px solid #e0e0e0;
     display: flex;
     gap: 10px;
+    flex-shrink: 0; /* Запрещаем сжиматься */
+    align-items: center;
 }
 
 .message-input-container input {
     flex: 1;
-    padding: 12px;
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 25px;
+    font-size: 14px;
 }
 
 .message-input-container button {
     padding: 12px 24px;
+    border-radius: 25px;
+    background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+    border: none;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.message-input-container button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(37, 117, 252, 0.4);
+}
+
+.message-input-container button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .no-messages {
@@ -314,6 +359,47 @@ button:disabled {
     margin-top: 50px;
 }
 
+/* Стили для скроллбара */
+.messages-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Индикатор новых сообщений */
+.new-message-indicator {
+    position: absolute;
+    bottom: 80px;
+    right: 20px;
+    background: #2575fc;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* Адаптивность */
 @media (max-width: 768px) {
     .container {
         height: 100vh;
@@ -322,15 +408,48 @@ button:disabled {
     
     .main-app {
         grid-template-columns: 1fr;
-        grid-template-rows: 60px 200px 1fr;
+        grid-template-rows: 60px auto 1fr auto;
     }
     
     .users-panel {
+        grid-row: 2;
+        max-height: 200px;
         border-right: none;
         border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .chat-area {
+        grid-row: 3 / 5;
     }
     
     .auth-section {
         padding: 20px;
     }
+    
+    .message-item {
+        max-width: 85%;
+    }
+}
+
+/* Темная тема для сообщений при прокрутке */
+.messages-container {
+    background: 
+        linear-gradient(180deg, 
+            rgba(250,250,250,1) 0%, 
+            rgba(250,250,250,0.8) 100%);
+}
+
+/* Эффект при прокрутке */
+.messages-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(180deg, 
+        rgba(255,255,255,0.8) 0%, 
+        transparent 100%);
+    pointer-events: none;
+    z-index: 1;
 }

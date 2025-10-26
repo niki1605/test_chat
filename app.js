@@ -331,3 +331,79 @@ window.addEventListener('beforeunload', () => {
         });
     }
 });
+
+// Автоматическая прокрутка к последнему сообщению
+function scrollToBottom() {
+    const messagesContainer = document.getElementById('messages-container');
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Обновите функцию loadMessages
+function loadMessages(otherUserId) {
+    // Остановка предыдущего слушателя
+    if (messagesListener) {
+        messagesListener();
+    }
+    
+    messagesContainer.innerHTML = '<div class="no-messages">Загрузка сообщений...</div>';
+    
+    // Получение ID чата
+    const chatId = [currentUser.uid, otherUserId].sort().join('_');
+    
+    messagesListener = db.collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .orderBy('timestamp', 'asc')
+        .onSnapshot((snapshot) => {
+            messagesContainer.innerHTML = '';
+            
+            if (snapshot.empty) {
+                messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Начните общение!</div>';
+                return;
+            }
+            
+            snapshot.forEach((doc) => {
+                const message = doc.data();
+                displayMessage(message);
+            });
+            
+            // Автоматическая прокрутка к последнему сообщению
+            scrollToBottom();
+        });
+}
+
+// Обновите функцию sendMessage для автоматической прокрутки
+function sendMessage() {
+    if (!selectedChatUser || !messageInput.value.trim()) return;
+    
+    const messageText = messageInput.value.trim();
+    const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
+    
+    const messageData = {
+        text: messageText,
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName || currentUser.name,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    // Сохранение сообщения
+    db.collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .add(messageData)
+        .then(() => {
+            messageInput.value = '';
+            // Фокус остается на поле ввода для быстрого набора следующего сообщения
+            messageInput.focus();
+        })
+        .catch((error) => {
+            console.error('Ошибка отправки сообщения:', error);
+        });
+}
+
+// Добавьте обработчик для автоматической прокрутки при изменении размера окна
+window.addEventListener('resize', () => {
+    if (selectedChatUser) {
+        setTimeout(scrollToBottom, 100);
+    }
+});
