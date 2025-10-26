@@ -453,3 +453,126 @@ button:disabled {
     pointer-events: none;
     z-index: 1;
 }
+
+/* Статусы сообщений */
+.message-status {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 5px;
+    gap: 5px;
+    align-items: center;
+}
+
+.message-status .status-icon {
+    font-size: 14px;
+    opacity: 0.7;
+}
+
+.message-status .status-icon.sent { color: #95a5a6; }
+.message-status .status-icon.delivered { color: #3498db; }
+.message-status .status-icon.read { color: #2ecc71; }
+
+/* Счетчик непрочитанных сообщений */
+.unread-count {
+    background: #e74c3c;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    font-weight: bold;
+}
+
+/* Время и статус в одной строке */
+.message-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 5px;
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+.message-time {
+    font-size: 11px;
+}
+
+/* Уведомление о наборе текста */
+.typing-indicator {
+    padding: 10px 15px;
+    font-style: italic;
+    color: #666;
+    font-size: 12px;
+    background: #f8f9fa;
+    border-radius: 15px;
+    margin: 5px 0;
+    display: inline-block;
+    max-width: 70%;
+}
+
+/* Статус онлайн в чате */
+.chat-user-status {
+    font-size: 12px;
+    color: #666;
+    font-weight: normal;
+}
+
+.chat-user-status.online {
+    color: #2ecc71;
+}
+
+/* Улучшенные стили для пользователей */
+.user-item {
+    position: relative;
+    padding: 12px;
+    margin-bottom: 8px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    display: flex;
+    align-items: center;
+}
+
+.user-info-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.user-last-message {
+    font-size: 12px;
+    color: #666;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+/* Анимация для новых сообщений */
+@keyframes highlightMessage {
+    0% { background-color: rgba(37, 117, 252, 0.1); }
+    100% { background-color: transparent; }
+}
+
+.message-item.new {
+    animation: highlightMessage 2s ease;
+}
+
+/* Статус в хедере чата */
+.chat-header-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-header-status {
+    font-size: 12px;
+    color: #666;
+    margin-top: 2px;
+}
