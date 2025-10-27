@@ -741,6 +741,69 @@ if (!("Notification" in window)) {
     setTimeout(() => {
         notification.close();
     }, 5000);
+
+    
+}
+
+
+// Проверяем нужно ли показывать кнопку
+function checkMobileNotifications() {
+    const isMobile = Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        console.log("📱 Обнаружено мобильное устройство");
+        
+        if (Notification.permission === "default") {
+            // Показываем кнопку только если еще не запрашивали
+            const alreadyAsked = localStorage.getItem('notificationsAsked');
+            if (!alreadyAsked) {
+                document.getElementById('mobile-notification-request').style.display = 'block';
+                localStorage.setItem('notificationsAsked', 'true');
+            }
+        } else if (Notification.permission === "granted") {
+            // Уже разрешено - скрываем кнопку
+            document.getElementById('mobile-notification-request').style.display = 'none';
+        }
+    }
+}
+
+// Функция специально для мобильных
+function requestMobileNotificationPermission() {
+    console.log("📱 Запрос разрешения для мобильного");
+    
+    if (!("Notification" in window)) {
+        alert("Ваш браузер не поддерживает уведомления");
+        return;
+    }
+    
+    // Этот вызов ДОЛЖЕН быть по клику пользователя на мобильных
+    Notification.requestPermission().then(permission => {
+        console.log("Мобильное разрешение:", permission);
+        
+        if (permission === "granted") {
+            // Скрываем кнопку
+            document.getElementById('mobile-notification-request').style.display = 'none';
+            
+            // Показываем тестовое уведомление
+            showTestNotification();
+            
+            // Сохраняем в localStorage что разрешили
+            localStorage.setItem('notificationsGranted', 'true');
+        } else {
+            alert("Разрешите уведомления в настройках браузера");
+        }
+    });
+}
+
+// Показать тестовое уведомление
+function showTestNotification() {
+    if (Notification.permission === "granted") {
+        new Notification("SAS Messenger", {
+            body: "Уведомления включены! Вы будете получать сообщения",
+            icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>",
+            tag: "welcome"
+        });
+    }
 }
 
 // Проверяем активно ли окно
@@ -1002,8 +1065,16 @@ auth.onAuthStateChanged((user) => {
                         ...userData
                     };
 
-                    // Проверяем при загрузке
-checkNotificationSupport();
+
+ // Запрашиваем уведомления
+        setTimeout(() => {
+            requestNotificationPermission();
+        }, 2000);
+
+                     // Проверяем мобильные уведомления
+        setTimeout(() => {
+            checkMobileNotifications();
+        }, 2000);
      
                     
                     userNameSpan.textContent = userData.name;
