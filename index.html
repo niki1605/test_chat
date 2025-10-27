@@ -128,25 +128,9 @@
             <input type="checkbox" id="browser-notifications" checked>
             <span class="slider"></span>
         </label>
-        <span>Браузерные уведомления</span>
-    </div>
-    <div class="switch-group">
-        <label class="switch">
-            <input type="checkbox" id="sound-notifications" checked>
-            <span class="slider"></span>
-        </label>
-        <span>Звуковые уведомления</span>
-    </div>
     <button onclick="requestNotificationPermission()" class="permission-btn">
         🔔 Разрешить уведомления
     </button>
-    <!-- Добавьте в main-app после header -->
-<div id="mobile-notification-request" style="display: none; background: #ffeb3b; padding: 10px; text-align: center;">
-    <p>🔔 Включите уведомления, чтобы не пропустить сообщения</p>
-    <button onclick="requestMobileNotificationPermission()" style="background: #2196f3; color: white; padding: 10px 20px; border: none; border-radius: 5px;">
-        Разрешить уведомления
-    </button>
-</div>
 </div>
 
             <!-- Список пользователей -->
