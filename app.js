@@ -19,6 +19,7 @@ let selectedChatUser = null;
 let messagesListener = null;
 let usersListener = null;
 let lastMessageQuery = null;
+let searchResultsListener = null;
 
 // Переключение между вкладками
 loginTab.addEventListener('click', () => {
@@ -576,5 +577,210 @@ window.addEventListener('beforeunload', () => {
             online: false,
             lastSeen: firebase.firestore.FieldValue.serverTimestamp()
         });
+    }
+});
+
+// Функция поиска пользователей
+function searchUsers(searchTerm) {
+    const searchResults = document.getElementById('search-results');
+    
+    if (searchTerm.length < 2) {
+        searchResults.innerHTML = '<div class="no-results">Введите минимум 2 символа</div>';
+        return;
+    }
+    
+    // Останавливаем предыдущий поиск
+    if (searchResultsListener) {
+        searchResultsListener();
+    }
+    
+    searchResults.innerHTML = '<div class="no-results">Поиск...</div>';
+    
+    // Ищем пользователей по имени
+    searchResultsListener = db.collection('users')
+        .where('name', '>=', searchTerm)
+        .where('name', '<=', searchTerm + '\uf8ff')
+        .where('email', '!=', currentUser.email)
+        .onSnapshot((snapshot) => {
+            searchResults.innerHTML = '';
+            
+            if (snapshot.empty) {
+                searchResults.innerHTML = '<div class="no-results">Пользователи не найдены</div>';
+                return;
+            }
+            
+            snapshot.forEach((doc) => {
+                const user = doc.data();
+                const searchItem = document.createElement('div');
+                searchItem.className = 'search-result-item';
+                searchItem.innerHTML = `
+                    <div>${user.name}</div>
+                    <small>${user.online ? 'В сети' : 'Не в сети'}</small>
+                `;
+                
+                searchItem.addEventListener('click', async () => {
+                    // Проверяем, есть ли уже чат с этим пользователем
+                    const hasChat = await checkExistingChat(doc.id);
+                    
+                    if (!hasChat) {
+                        // Создаем новый чат
+                        await createNewChat(doc.id, user);
+                    }
+                    
+                    // Выбираем пользователя для чата
+                    selectUserForChat(doc.id, user);
+                    
+                    // Очищаем поиск
+                    document.getElementById('user-search').value = '';
+                    searchResults.innerHTML = '';
+                });
+                
+                searchResults.appendChild(searchItem);
+            });
+        });
+}
+
+// Проверка существующего чата
+async function checkExistingChat(otherUserId) {
+    const chatId = [currentUser.uid, otherUserId].sort().join('_');
+    
+    try {
+        const chatDoc = await db.collection('chats').doc(chatId).get();
+        return chatDoc.exists;
+    } catch (error) {
+        console.error('Ошибка проверки чата:', error);
+        return false;
+    }
+}
+
+// Создание нового чата
+async function createNewChat(otherUserId, userData) {
+    const chatId = [currentUser.uid, otherUserId].sort().join('_');
+    
+    try {
+        await db.collection('chats').doc(chatId).set({
+            participants: [currentUser.uid, otherUserId],
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastMessage: null,
+            lastMessageTime: null
+        });
+        
+        // Добавляем пользователя в список активных чатов
+        addUserToActiveChats(otherUserId, userData);
+        
+    } catch (error) {
+        console.error('Ошибка создания чата:', error);
+    }
+}
+
+// Добавление пользователя в активные чаты
+function addUserToActiveChats(userId, userData) {
+    const usersList = document.getElementById('users-list');
+    
+    // Проверяем, нет ли уже такого пользователя
+    const existingItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
+    if (existingItem) {
+        return;
+    }
+    
+    const userItem = document.createElement('div');
+    userItem.className = 'user-item';
+    userItem.dataset.userId = userId;
+    
+    userItem.innerHTML = `
+        <div class="user-info-content">
+            <span class="status ${userData.online ? 'online' : 'offline'}"></span>
+            <div>
+                <div>${userData.name}</div>
+                <div class="user-last-message">Новый чат</div>
+            </div>
+            <div class="unread-count" style="display: none;">0</div>
+        </div>
+    `;
+    
+    userItem.addEventListener('click', () => {
+        selectUserForChat(userId, userData);
+    });
+    
+    usersList.appendChild(userItem);
+}
+
+// Загрузка только пользователей с активными чатами
+function loadActiveChats() {
+    if (usersListener) {
+        usersListener();
+    }
+    
+    usersListener = db.collection('chats')
+        .where('participants', 'array-contains', currentUser.uid)
+        .onSnapshot(async (snapshot) => {
+            const usersList = document.getElementById('users-list');
+            usersList.innerHTML = '';
+            
+            for (const doc of snapshot.docs) {
+                const chatData = doc.data();
+                const otherUserId = chatData.participants.find(id => id !== currentUser.uid);
+                
+                if (otherUserId) {
+                    try {
+                        // Получаем данные пользователя
+                        const userDoc = await db.collection('users').doc(otherUserId).get();
+                        if (userDoc.exists) {
+                            const userData = userDoc.data();
+                            const unreadCount = await getUnreadCount(otherUserId);
+                            
+                            const userItem = document.createElement('div');
+                            userItem.className = 'user-item';
+                            userItem.dataset.userId = otherUserId;
+                            
+                            userItem.innerHTML = `
+                                <div class="user-info-content">
+                                    <span class="status ${userData.online ? 'online' : 'offline'}"></span>
+                                    <div>
+                                        <div>${userData.name}</div>
+                                        <div class="user-last-message">
+                                            ${chatData.lastMessage || 'Нет сообщений'}
+                                        </div>
+                                    </div>
+                                    ${unreadCount > 0 ? `<div class="unread-count">${unreadCount}</div>` : ''}
+                                </div>
+                            `;
+                            
+                            userItem.addEventListener('click', () => {
+                                selectUserForChat(otherUserId, userData);
+                            });
+                            
+                            usersList.appendChild(userItem);
+                        }
+                    } catch (error) {
+                        console.error('Ошибка загрузки пользователя:', error);
+                    }
+                }
+            }
+        });
+}
+
+// Обработчики поиска
+document.getElementById('search-btn').addEventListener('click', () => {
+    const searchTerm = document.getElementById('user-search').value.trim();
+    searchUsers(searchTerm);
+});
+
+document.getElementById('user-search').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        const searchTerm = document.getElementById('user-search').value.trim();
+        searchUsers(searchTerm);
+    }
+});
+
+// В функции onAuthStateChanged замените loadUsers() на loadActiveChats()
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        // ... существующий код ...
+        
+        // Загружаем активные чаты вместо всех пользователей
+        loadActiveChats();
+        
+        // ... остальной код ...
     }
 });

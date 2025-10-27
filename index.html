@@ -72,12 +72,25 @@
             </div>
 
             <!-- Список пользователей -->
-            <div class="users-panel">
-                <h3>Пользователи онлайн</h3>
-                <div class="users-list" id="users-list">
-                    <!-- Список пользователей будет здесь -->
-                </div>
-            </div>
+          <div class="users-panel">
+    <div class="search-section">
+        <h3>Поиск пользователей</h3>
+        <div class="search-container">
+            <input type="text" id="user-search" placeholder="Введите имя пользователя...">
+            <button id="search-btn">Найти</button>
+        </div>
+        <div class="search-results" id="search-results">
+            <!-- Результаты поиска будут здесь -->
+        </div>
+    </div>
+    
+    <div class="active-chats-section">
+        <h3>Активные чаты</h3>
+        <div class="users-list" id="users-list">
+            <!-- Только пользователи, с которыми есть чат -->
+        </div>
+    </div>
+</div>
 
             <!-- Область чата -->
             <div class="chat-area">
