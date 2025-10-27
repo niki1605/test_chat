@@ -558,26 +558,43 @@ function loadMessages(otherUserId) {
     // Получение ID чата
     const chatId = [currentUser.uid, otherUserId].sort().join('_');
     
-messagesListener = db.collection('chats')
-    .doc(chatId)
-    .collection('messages')
-    .orderBy('timestamp', 'asc')
-    .onSnapshot((snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-            if (change.type === 'added') {
+    messagesListener = db.collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .orderBy('timestamp', 'asc')
+        .onSnapshot((snapshot) => {
+            messagesContainer.innerHTML = '';
+            
+            if (snapshot.empty) {
+                messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Начните общение!</div>';
+                return;
+            }
+            
+            // Обрабатываем все изменения
+            snapshot.docChanges().forEach((change) => {
                 const message = change.doc.data();
                 
-                // Показываем уведомление для НОВЫХ сообщений
-                if (message.timestamp > Date.now() - 5000) { // Только свежие
-                    showMessageNotification(message);
+                if (change.type === 'added' || change.type === 'modified') {
+                    displayMessage(message);
+                    
+                    // Уведомления только для НОВЫХ сообщений от других пользователей
+                    if (change.type === 'added' && 
+                        message.senderId !== currentUser.uid) {
+                        
+                        // Проверяем что сообщение свежее (не старше 10 секунд)
+                        const isNew = message.timestamp && 
+                            message.timestamp.toDate() > new Date(Date.now() - 10000);
+                        
+                        if (isNew) {
+                            console.log("🆕 Новое сообщение для уведомления");
+                            showMessageNotification(message);
+                        }
+                    }
                 }
-                
-                displayMessage(message);
-            }
+            });
+            
+            scrollToBottom();
         });
-        
-        scrollToBottom();
-    });
 }
 
 // Отображение сообщения
@@ -623,7 +640,7 @@ function displayMessage(message) {
 
 // Отправка сообщения
 function sendMessage() {
-    if (!selectedChatUser || !messageInput.value.trim()) return;
+        if (!selectedChatUser || !messageInput.value.trim()) return;
     
     const messageText = messageInput.value.trim();
     const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
@@ -645,9 +662,6 @@ function sendMessage() {
         .then((docRef) => {
             messageInput.value = '';
             
-              // Отправка email уведомления
-              showMessageNotification(messageText);
-
             // Обновляем последнее сообщение в чате
             db.collection('chats').doc(chatId).update({
                 lastMessage: messageText,
@@ -665,6 +679,9 @@ function sendMessage() {
                     });
             }, 1000);
             
+            // Отправляем EMAIL уведомление
+            //sendEmailNotification(selectedChatUser, messageText);
+            
             // Фокус остается на поле ввода
             messageInput.focus();
         })
@@ -680,28 +697,6 @@ function showMessageNotification(message) {
         playNotificationSound(); // Звук только если страница неактивна
     }
 
-if (!("Notification" in window)) {
-        console.error("❌ Notification API не поддерживается");
-        return;
-    }
-    
-    if (Notification.permission !== "granted") {
-        console.log("❌ Нет разрешения на уведомления");
-        return;
-    }
-    
-    // Проверяем активен ли чат с этим пользователем
-    if (selectedChatUser && selectedChatUser.id === message.senderId) {
-        console.log("✅ Чат активен - уведомление не показываем");
-        return;
-    }
-    
-    // Проверяем активно ли окно
-    if (document.hasFocus()) {
-        console.log("✅ Окно активно - уведомление не показываем");
-        return;
-    }
-    
     if (!("Notification" in window) || Notification.permission !== "granted") {
         return;
     }
@@ -715,7 +710,6 @@ if (!("Notification" in window)) {
     if (document.hasFocus()) {
         return; // Не показываем если пользователь на сайте
     }
-    
     
     const notification = new Notification(`💬 ${message.senderName}`, {
         body: message.text.length > 50 ? message.text.substring(0, 50) + "..." : message.text,
@@ -741,95 +735,8 @@ if (!("Notification" in window)) {
     setTimeout(() => {
         notification.close();
     }, 5000);
-
-    
 }
 
-
-// Проверяем нужно ли показывать кнопку
-function checkMobileNotifications() {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-        console.log("📱 Обнаружено мобильное устройство");
-        
-        if (Notification.permission === "default") {
-            // Показываем кнопку только если еще не запрашивали
-            const alreadyAsked = localStorage.getItem('notificationsAsked');
-            if (!alreadyAsked) {
-                document.getElementById('mobile-notification-request').style.display = 'block';
-                localStorage.setItem('notificationsAsked', 'true');
-            }
-        } else if (Notification.permission === "granted") {
-            // Уже разрешено - скрываем кнопку
-            document.getElementById('mobile-notification-request').style.display = 'none';
-        }
-    }
-}
-
-// Функция специально для мобильных
-function requestMobileNotificationPermission() {
-    console.log("📱 Запрос разрешения для мобильного");
-    
-    if (!("Notification" in window)) {
-        alert("Ваш браузер не поддерживает уведомления");
-        return;
-    }
-    
-    // Этот вызов ДОЛЖЕН быть по клику пользователя на мобильных
-    Notification.requestPermission().then(permission => {
-        console.log("Мобильное разрешение:", permission);
-        
-        if (permission === "granted") {
-            // Скрываем кнопку
-            document.getElementById('mobile-notification-request').style.display = 'none';
-            
-            // Показываем тестовое уведомление
-            showTestNotification();
-            
-            // Сохраняем в localStorage что разрешили
-            localStorage.setItem('notificationsGranted', 'true');
-        } else {
-            alert("Разрешите уведомления в настройках браузера");
-        }
-    });
-}
-
-// Показать тестовое уведомление
-function showTestNotification() {
-    if (Notification.permission === "granted") {
-        new Notification("SAS Messenger", {
-            body: "Уведомления включены! Вы будете получать сообщения",
-            icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>",
-            tag: "welcome"
-        });
-    }
-}
-
-// Проверяем активно ли окно
-function isWindowFocused() {
-    return document.hasFocus();
-}
-
-// Функция воспроизведения звука
-function playNotificationSound() {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.value = 800;
-    oscillator.type = 'sine';
-    
-    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.1);
-    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.3);
-}
 
 // Слушатель изменения видимости
 document.addEventListener('visibilitychange', function() {
@@ -852,26 +759,9 @@ function onFirstMessageReceived() {
     }
 }
 
-// Проверка возможностей
-function checkNotificationSupport() {
-    const support = {
-        notifications: "Notification" in window,
-        serviceWorker: "serviceWorker" in navigator,
-        pushManager: "PushManager" in window
-    };
-    
-    console.log("Поддержка уведомлений:", support);
-    
-    if (!support.notifications) {
-        console.warn("Браузер не поддерживает уведомления");
-    }
-    
-    return support;
-}
 
 
-
-// Функция запроса разрешения
+// Запрос разрешения на уведомления
 function requestNotificationPermission() {
     if (!("Notification" in window)) {
         console.log("Браузер не поддерживает уведомления");
@@ -880,9 +770,9 @@ function requestNotificationPermission() {
     
     if (Notification.permission === "default") {
         Notification.requestPermission().then(permission => {
+            console.log("Результат запроса уведомлений:", permission);
             if (permission === "granted") {
-                console.log("Разрешение на уведомления получено!");
-                showWelcomeNotification();
+                console.log("✅ Уведомления разрешены!");
             }
         });
     }
@@ -1065,17 +955,10 @@ auth.onAuthStateChanged((user) => {
                         ...userData
                     };
 
-
- // Запрашиваем уведомления
+               // Запрашиваем уведомления через 3 секунды после входа
         setTimeout(() => {
             requestNotificationPermission();
-        }, 2000);
-
-                     // Проверяем мобильные уведомления
-        setTimeout(() => {
-            checkMobileNotifications();
-        }, 2000);
-     
+        }, 3000);
                     
                     userNameSpan.textContent = userData.name;
                     
