@@ -755,6 +755,34 @@ document.addEventListener('visibilitychange', function() {
 });
 
 
+function onFirstMessageReceived() {
+    if (Notification.permission === "default") {
+        // Вежливый запрос при первом сообщении
+        setTimeout(() => {
+            if (confirm("Хотите получать уведомления о новых сообщениях?")) {
+                requestNotificationPermission();
+            }
+        }, 1000);
+    }
+}
+
+// Проверка возможностей
+function checkNotificationSupport() {
+    const support = {
+        notifications: "Notification" in window,
+        serviceWorker: "serviceWorker" in navigator,
+        pushManager: "PushManager" in window
+    };
+    
+    console.log("Поддержка уведомлений:", support);
+    
+    if (!support.notifications) {
+        console.warn("Браузер не поддерживает уведомления");
+    }
+    
+    return support;
+}
+
 
 
 // Функция запроса разрешения
@@ -951,10 +979,9 @@ auth.onAuthStateChanged((user) => {
                         ...userData
                     };
 
-                      // Запрашиваем уведомления
-        setTimeout(() => {
-            requestNotificationPermission();
-        }, 2000);
+                    // Проверяем при загрузке
+checkNotificationSupport();
+     
                     
                     userNameSpan.textContent = userData.name;
                     
