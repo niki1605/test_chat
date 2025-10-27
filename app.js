@@ -558,26 +558,26 @@ function loadMessages(otherUserId) {
     // Получение ID чата
     const chatId = [currentUser.uid, otherUserId].sort().join('_');
     
-    messagesListener = db.collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .orderBy('timestamp', 'asc')
-        .onSnapshot((snapshot) => {
-            messagesContainer.innerHTML = '';
-            
-            if (snapshot.empty) {
-                messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Начните общение!</div>';
-                return;
-            }
-            
-            snapshot.forEach((doc) => {
-                const message = doc.data();
+messagesListener = db.collection('chats')
+    .doc(chatId)
+    .collection('messages')
+    .orderBy('timestamp', 'asc')
+    .onSnapshot((snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+                const message = change.doc.data();
+                
+                // Показываем уведомление для НОВЫХ сообщений
+                if (message.timestamp > Date.now() - 5000) { // Только свежие
+                    showMessageNotification(message);
+                }
+                
                 displayMessage(message);
-            });
-            
-            // Автоматическая прокрутка к последнему сообщению
-            scrollToBottom();
+            }
         });
+        
+        scrollToBottom();
+    });
 }
 
 // Отображение сообщения
@@ -646,7 +646,7 @@ function sendMessage() {
             messageInput.value = '';
             
               // Отправка email уведомления
-              sendEmailNotification(selectedChatUser, messageText);
+              showMessageNotification(messageText);
 
             // Обновляем последнее сообщение в чате
             db.collection('chats').doc(chatId).update({
@@ -673,52 +673,115 @@ function sendMessage() {
         });
 }
 
-// Отправка уведомления на email
-function sendEmailNotification(recipient, messageText) {
+// Функция показа уведомления
+function showMessageNotification(message) {
+
+  if (!isWindowFocused()) {
+        playNotificationSound(); // Звук только если страница неактивна
+    }
+
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+        return;
+    }
     
-    const emailParams = {
-        to_email: recipient.email,
-        to_name: recipient.name,
-        from_name: currentUser.name,
-        message: messageText,
-        app_name: "SAS Messenger",
-        reply_to: currentUser.email
+    // Проверяем активен ли чат с этим пользователем
+    if (selectedChatUser && selectedChatUser.id === message.senderId) {
+        return; // Не показываем если чат открыт
+    }
+    
+    // Проверяем активно ли окно
+    if (document.hasFocus()) {
+        return; // Не показываем если пользователь на сайте
+    }
+    
+    const notification = new Notification(`💬 ${message.senderName}`, {
+        body: message.text.length > 50 ? message.text.substring(0, 50) + "..." : message.text,
+        icon: "/favicon.ico",
+        badge: "/favicon.ico",
+        tag: message.id, // Для группировки уведомлений
+        requireInteraction: false,
+        silent: false
+    });
+    
+    // При клике на уведомление открываем чат
+    notification.onclick = () => {
+        window.focus();
+        // Находим пользователя в списке и открываем чат
+        const userItem = document.querySelector(`[data-user-id="${message.senderId}"]`);
+        if (userItem) {
+            userItem.click();
+        }
+        notification.close();
     };
     
-    // Используем EmailJS если доступен
-    if (typeof emailjs !== 'undefined') {
-        emailjs.send('service_lebtcym', 'template_7ppymg8', emailParams)
-            .then(function(response) {
-                console.log('Email уведомление отправлено!', response.status);
-            }, function(error) {
-                console.log('Ошибка отправки email:', error);
-                //sendFallbackEmail(recipient, messageText);
-            });
+    // Автоматическое закрытие через 5 секунд
+    setTimeout(() => {
+        notification.close();
+    }, 5000);
+}
+
+// Проверяем активно ли окно
+function isWindowFocused() {
+    return document.hasFocus();
+}
+
+// Функция воспроизведения звука
+function playNotificationSound() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.1);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+}
+
+// Слушатель изменения видимости
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        console.log("Страница неактивна - уведомления будут показаны");
     } else {
-        // Fallback метод
-        console.log('Ошибка инициализации:', error);
-        //sendFallbackEmail(recipient, messageText);
+        console.log("Страница активна - уведомления скрыты");
+    }
+});
+
+
+
+
+// Функция запроса разрешения
+function requestNotificationPermission() {
+    if (!("Notification" in window)) {
+        console.log("Браузер не поддерживает уведомления");
+        return;
+    }
+    
+    if (Notification.permission === "default") {
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                console.log("Разрешение на уведомления получено!");
+                showWelcomeNotification();
+            }
+        });
     }
 }
 
-
-// Fallback метод отправки email
-function sendFallbackEmail(recipient, messageText) {
-    const subject = `SAS Messenger: Новое сообщение от ${currentUser.name}`;
-    const body = `Здравствуйте, ${recipient.name}!
-
-Вам пришло новое сообщение в SAS Messenger от ${currentUser.name}:
-
-"${messageText.substring(0, 200)}"
-
-Чтобы ответить на сообщение, перейдите в приложение SAS Messenger.
-
-С уважением,
-SAS Messenger Team`;
-    
-    // Открываем почтовый клиент (пользователь должен сам отправить)
-    const mailtoLink = `mailto:${recipient.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.open(mailtoLink, '_blank');
+// Приветственное уведомление
+function showWelcomeNotification() {
+    if (Notification.permission === "granted") {
+        new Notification("SAS Messenger", {
+            body: "Теперь вы будете получать уведомления о новых сообщениях",
+            icon: "/favicon.ico"
+        });
+    }
 }
 
 // Пометить сообщения как прочитанные
@@ -887,6 +950,11 @@ auth.onAuthStateChanged((user) => {
                         email: user.email,
                         ...userData
                     };
+
+                      // Запрашиваем уведомления
+        setTimeout(() => {
+            requestNotificationPermission();
+        }, 2000);
                     
                     userNameSpan.textContent = userData.name;
                     

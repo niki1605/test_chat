@@ -120,6 +120,28 @@
                 </div>
             </div>
 
+            <!-- Простые настройки -->
+<div class="notification-settings">
+    <h4>Уведомления</h4>
+    <div class="switch-group">
+        <label class="switch">
+            <input type="checkbox" id="browser-notifications" checked>
+            <span class="slider"></span>
+        </label>
+        <span>Браузерные уведомления</span>
+    </div>
+    <div class="switch-group">
+        <label class="switch">
+            <input type="checkbox" id="sound-notifications" checked>
+            <span class="slider"></span>
+        </label>
+        <span>Звуковые уведомления</span>
+    </div>
+    <button onclick="requestNotificationPermission()" class="permission-btn">
+        🔔 Разрешить уведомления
+    </button>
+</div>
+
             <!-- Список пользователей -->
           <div class="users-panel">
     <div class="search-section">
