@@ -605,8 +605,6 @@ function sendMessage() {
 
 // Отправка уведомления на email
 function sendEmailNotification(recipient, messageText) {
-    // Проверяем, включены ли уведомления у получателя
-    if (!recipient.emailNotifications) return;
     
     const emailParams = {
         to_email: recipient.email,
@@ -628,7 +626,8 @@ function sendEmailNotification(recipient, messageText) {
             });
     } else {
         // Fallback метод
-        sendFallbackEmail(recipient, messageText);
+        console.log('Ошибка инициализации:', error);
+        //sendFallbackEmail(recipient, messageText);
     }
 }
 
