@@ -21,11 +21,6 @@ let usersListener = null;
 let searchTimeout = null;
 let searchResultsListener = null;
 
-const EMAILJS_CONFIG = {
-    serviceId: 'service_lebtcym',
-    templateId: 'template_7ppymg8'
-};
-
 // Переключение между вкладками
 loginTab.addEventListener('click', () => {
     loginTab.classList.add('active');
@@ -617,15 +612,14 @@ function sendEmailNotification(recipient, messageText) {
         to_email: recipient.email,
         to_name: recipient.name,
         from_name: currentUser.name,
-        message: messageText.substring(0, 100), // обрезаем длинные сообщения
+        message: messageText,
         app_name: "SAS Messenger",
-        reply_to: currentUser.email,
-        timestamp: new Date().toLocaleString('ru-RU')
+        reply_to: currentUser.email
     };
     
     // Используем EmailJS если доступен
     if (typeof emailjs !== 'undefined') {
-        emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, emailParams)
+        emailjs.send('service_lebtcym', 'template_7ppymg8', emailParams)
             .then(function(response) {
                 console.log('Email уведомление отправлено!', response.status);
             }, function(error) {
@@ -634,8 +628,28 @@ function sendEmailNotification(recipient, messageText) {
             });
     } else {
         // Fallback метод
-        //sendFallbackEmail(recipient, messageText);
+        sendFallbackEmail(recipient, messageText);
     }
+}
+
+
+// Fallback метод отправки email
+function sendFallbackEmail(recipient, messageText) {
+    const subject = `SAS Messenger: Новое сообщение от ${currentUser.name}`;
+    const body = `Здравствуйте, ${recipient.name}!
+
+Вам пришло новое сообщение в SAS Messenger от ${currentUser.name}:
+
+"${messageText.substring(0, 200)}"
+
+Чтобы ответить на сообщение, перейдите в приложение SAS Messenger.
+
+С уважением,
+SAS Messenger Team`;
+    
+    // Открываем почтовый клиент (пользователь должен сам отправить)
+    const mailtoLink = `mailto:${recipient.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoLink, '_blank');
 }
 
 // Пометить сообщения как прочитанные
