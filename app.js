@@ -20,6 +20,10 @@ let messagesListener = null;
 let usersListener = null;
 let searchTimeout = null;
 let searchResultsListener = null;
+// Добавьте в переменные состояния
+let emailVerificationCode = null;
+let verificationTimer = null;
+let resendTimeout = null;
 
 // Переключение между вкладками
 loginTab.addEventListener('click', () => {
@@ -27,6 +31,11 @@ loginTab.addEventListener('click', () => {
     registerTab.classList.remove('active');
     loginForm.classList.add('active');
     registerForm.classList.remove('active');
+     // Сброс подтверждения email
+    emailVerificationCode = null;
+    toggleVerificationSection(false);
+    if (verificationTimer) clearInterval(verificationTimer);
+    if (resendTimeout) clearTimeout(resendTimeout);
 });
 
 registerTab.addEventListener('click', () => {
@@ -37,61 +46,119 @@ registerTab.addEventListener('click', () => {
 });
 
 // Обработка формы регистрации
-document.getElementById('registerForm').addEventListener('submit', (e) => {
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const name = document.getElementById('register-name').value;
     const email = document.getElementById('register-email').value;
     const password = document.getElementById('register-password').value;
+    const verifyCode = document.getElementById('verify-code').value;
     const messageDiv = document.getElementById('register-message');
     
-    // Регистрация пользователя
-    auth.createUserWithEmailAndPassword(email, password)
-        .then((userCredential) => {
-            // Сохранение имени пользователя в Firestore
-            return db.collection('users').doc(userCredential.user.uid).set({
-                name: name,
-                email: email,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
-                online: true,
-                emailNotifications: true
-            });
-        })
-        .then(() => {
-            messageDiv.textContent = 'Зарегистрировано!';
+    // Если код подтверждения еще не отправлен
+    if (!emailVerificationCode) {
+        // Отправляем код подтверждения
+        messageDiv.textContent = 'Отправка кода подтверждения на email...';
+        messageDiv.className = 'message';
+        messageDiv.style.display = 'block';
+        
+        const codeSent = await sendVerificationCode(email, name);
+        
+        if (codeSent) {
+            toggleVerificationSection(true);
+            messageDiv.textContent = 'Код подтверждения отправлен на ваш email!';
             messageDiv.className = 'message success';
-            messageDiv.style.display = 'block';
-            
-            // Очистка формы
-            document.getElementById('registerForm').reset();
-            
-            // Переключение на вкладку входа
-            setTimeout(() => {
-                loginTab.click();
-            }, 1500);
-        })
-        .catch((error) => {
-            let errorMessage = 'Ошибка регистрации';
-            
-            if (error.code === 'auth/email-already-in-use') {
-                errorMessage = 'Этот email уже используется';
-            } else if (error.code === 'auth/weak-password') {
-                errorMessage = 'Пароль должен содержать не менее 6 символов';
-            } else if (error.code === 'auth/invalid-email') {
-                errorMessage = 'Некорректный email';
-            } else if (error.code === 'auth/network-request-failed') {
-                errorMessage = 'Проблема с сетью. Проверьте подключение к интернету';
-            } else if (error.message.includes('CORS') || error.message.includes('Access-Control')) {
-                errorMessage = 'Ошибка доступа. Откройте приложение с локального сервера (localhost)';
-            }
-            
-            messageDiv.textContent = errorMessage;
+            document.getElementById('verify-code').focus();
+        } else {
+            messageDiv.textContent = 'Ошибка отправки кода. Попробуйте еще раз.';
             messageDiv.className = 'message error';
-            messageDiv.style.display = 'block';
-            
-            console.error('Детали ошибки:', error);
+        }
+        return;
+    }
+    
+    // Проверяем код подтверждения
+    if (!verifyCode(verifyCode)) {
+        messageDiv.textContent = 'Неверный код подтверждения';
+        messageDiv.className = 'message error';
+        messageDiv.style.display = 'block';
+        return;
+    }
+    
+    // Код верный - регистрируем пользователя
+    try {
+        // Регистрация в Firebase Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        
+        // Отправляем email подтверждения Firebase
+        await userCredential.user.sendEmailVerification();
+        
+        // Сохраняем пользователя в Firestore
+        await db.collection('users').doc(userCredential.user.uid).set({
+            name: name,
+            email: email,
+            emailVerified: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+            online: true,
+            emailNotifications: true
         });
+        
+        messageDiv.textContent = 'Регистрация успешна! Проверьте email для подтверждения.';
+        messageDiv.className = 'message success';
+        messageDiv.style.display = 'block';
+        
+        // Очистка формы и сброс состояния
+        document.getElementById('registerForm').reset();
+        emailVerificationCode = null;
+        toggleVerificationSection(false);
+        
+        // Переход к входу через 3 секунды
+        setTimeout(() => {
+            loginTab.click();
+        }, 3000);
+        
+    } catch (error) {
+        let errorMessage = 'Ошибка регистрации';
+        
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = 'Этот email уже используется';
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = 'Пароль должен содержать не менее 6 символов';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'Некорректный email';
+        }
+        
+        messageDiv.textContent = errorMessage;
+        messageDiv.className = 'message error';
+        messageDiv.style.display = 'block';
+    }
+});
+
+// Обработчик повторной отправки кода
+document.getElementById('resend-code').addEventListener('click', async () => {
+    const email = document.getElementById('register-email').value;
+    const name = document.getElementById('register-name').value;
+    const messageDiv = document.getElementById('register-message');
+    
+    if (!email || !name) {
+        messageDiv.textContent = 'Заполните email и имя';
+        messageDiv.className = 'message error';
+        messageDiv.style.display = 'block';
+        return;
+    }
+    
+    messageDiv.textContent = 'Отправка кода...';
+    messageDiv.className = 'message';
+    
+    const codeSent = await sendVerificationCode(email, name);
+    
+    if (codeSent) {
+        messageDiv.textContent = 'Код отправлен повторно!';
+        messageDiv.className = 'message success';
+    } else {
+        messageDiv.textContent = 'Ошибка отправки кода';
+        messageDiv.className = 'message error';
+    }
 });
 
 // Обработка формы входа
@@ -653,7 +720,7 @@ SAS Messenger Team`;
 
 // Пометить сообщения как прочитанные
 async function markMessagesAsRead(otherUserId) {
-    if (!selectedChatUser) return;
+  if (!selectedChatUser) return;
     
     const chatId = [currentUser.uid, otherUserId].sort().join('_');
     
@@ -677,9 +744,30 @@ async function markMessagesAsRead(otherUserId) {
         
         await batch.commit();
         
+        // ОБНОВЛЯЕМ СЧЕТЧИК НЕПРОЧИТАННЫХ СРАЗУ ПОСЛЕ ПОМЕТКИ
+        updateUnreadCount(otherUserId, 0);
+        
     } catch (error) {
         console.error('Ошибка пометки сообщений как прочитанных:', error);
     }
+}
+
+// Слушатель для обновления счетчиков непрочитанных в реальном времени
+function startUnreadCountListener() {
+    // Слушаем все чаты текущего пользователя
+    return db.collection('chats')
+        .where('participants', 'array-contains', currentUser.uid)
+        .onSnapshot(async (snapshot) => {
+            for (const doc of snapshot.docs) {
+                const chatData = doc.data();
+                const otherUserId = chatData.participants.find(id => id !== currentUser.uid);
+                
+                if (otherUserId) {
+                    const unreadCount = await getUnreadCount(otherUserId);
+                    updateUnreadCount(otherUserId, unreadCount);
+                }
+            }
+        });
 }
 
 // Получение количества непрочитанных сообщений
@@ -703,7 +791,7 @@ async function getUnreadCount(otherUserId) {
 
 // Обновление счетчика непрочитанных
 function updateUnreadCount(userId, count) {
-    const userItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
+   const userItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
     if (userItem) {
         let unreadCountEl = userItem.querySelector('.unread-count');
         
@@ -715,8 +803,19 @@ function updateUnreadCount(userId, count) {
             }
             unreadCountEl.textContent = count;
             unreadCountEl.style.display = 'flex';
+            
+            // Добавляем анимацию для новых сообщений
+            userItem.style.background = '#e3f2fd';
+            setTimeout(() => {
+                userItem.style.background = '';
+            }, 2000);
         } else if (unreadCountEl) {
-            unreadCountEl.style.display = 'none';
+            // ПЛАВНО СКРЫВАЕМ СЧЕТЧИК
+            unreadCountEl.style.opacity = '0';
+            setTimeout(() => {
+                unreadCountEl.style.display = 'none';
+                unreadCountEl.style.opacity = '1';
+            }, 300);
         }
     }
 }
@@ -804,18 +903,7 @@ auth.onAuthStateChanged((user) => {
                         lastSeen: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     
-                    // Слушатель для обновления счетчиков непрочитанных
-                    setInterval(() => {
-                        if (usersList.children.length > 0) {
-                            document.querySelectorAll('.user-item').forEach(async (item) => {
-                                const userId = item.dataset.userId;
-                                if (userId && userId !== currentUser.uid) {
-                                    const unreadCount = await getUnreadCount(userId);
-                                    updateUnreadCount(userId, unreadCount);
-                                }
-                            });
-                        }
-                    }, 5000);
+                   const unreadCountListener = startUnreadCountListener();
                 }
             });
     } else {
@@ -833,6 +921,9 @@ auth.onAuthStateChanged((user) => {
         if (searchResultsListener) {
             searchResultsListener();
         }
+        if (unreadCountListener) {
+    unreadCountListener(); // Добавьте эту строку
+}
         
         // Переключение на формы авторизации
         mainApp.style.display = 'none';
@@ -874,4 +965,78 @@ function debugAllChats() {
             console.log('Chat ID:', doc.id, 'Data:', doc.data());
         });
     });
+}
+
+// Генерация случайного кода
+function generateVerificationCode() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Отправка кода подтверждения на email
+async function sendVerificationCode(email, userName) {
+    const code = generateVerificationCode();
+    emailVerificationCode = code;
+    
+    const emailParams = {
+        to_email: email,
+        to_name: userName,
+        verification_code: code,
+        app_name: "SAS Messenger"
+    };
+    
+    try {
+        if (typeof emailjs !== 'undefined') {
+            await emailjs.send("service_lebtcym", 'template_bmwpa6f', emailParams);
+            console.log('Код подтверждения отправлен');
+        } else {
+            // Fallback - показываем код в консоли для тестирования
+            console.log('Код подтверждения (для тестирования):', code);
+            alert(`Для тестирования: код подтверждения - ${code}`);
+        }
+        
+        startVerificationTimer();
+        return true;
+    } catch (error) {
+        console.error('Ошибка отправки кода:', error);
+        return false;
+    }
+}
+
+// Таймер для повторной отправки кода
+function startVerificationTimer() {
+    let timeLeft = 60;
+    const timerElement = document.getElementById('verify-timer');
+    const resendBtn = document.getElementById('resend-code');
+    
+    resendBtn.disabled = true;
+    
+    verificationTimer = setInterval(() => {
+        timerElement.textContent = `Можно отправить снова через ${timeLeft} сек`;
+        timeLeft--;
+        
+        if (timeLeft < 0) {
+            clearInterval(verificationTimer);
+            timerElement.textContent = '';
+            resendBtn.disabled = false;
+        }
+    }, 1000);
+}
+
+// Показать/скрыть секцию подтверждения
+function toggleVerificationSection(show) {
+    const verifySection = document.getElementById('email-verify-section');
+    const registerBtn = document.getElementById('register-btn');
+    
+    if (show) {
+        verifySection.style.display = 'block';
+        registerBtn.textContent = 'Подтвердить email';
+    } else {
+        verifySection.style.display = 'none';
+        registerBtn.textContent = 'Зарегистрироваться';
+    }
+}
+
+// Проверка введенного кода
+function verifyCode(inputCode) {
+    return inputCode === emailVerificationCode;
 }
