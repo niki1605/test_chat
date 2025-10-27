@@ -748,7 +748,7 @@ if (!("Notification" in window)) {
 
 // Проверяем нужно ли показывать кнопку
 function checkMobileNotifications() {
-    const isMobile = Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile/i.test(navigator.userAgent);
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile/i.test(navigator.userAgent);
     
     if (isMobile) {
         console.log("📱 Обнаружено мобильное устройство");
