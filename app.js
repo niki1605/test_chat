@@ -24,6 +24,7 @@ let searchResultsListener = null;
 let emailVerificationCode = null;
 let verificationTimer = null;
 let resendTimeout = null;
+let unreadCountListener = null;
 
 // Переключение между вкладками
 loginTab.addEventListener('click', () => {
@@ -77,7 +78,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     }
     
     // Проверяем код подтверждения
-    if (!verifyCode(verifyCode)) {
+    if (!verifyCode1(verifyCode)) {
         messageDiv.textContent = 'Неверный код подтверждения';
         messageDiv.className = 'message error';
         messageDiv.style.display = 'block';
@@ -903,7 +904,7 @@ auth.onAuthStateChanged((user) => {
                         lastSeen: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     
-                   const unreadCountListener = startUnreadCountListener();
+                    unreadCountListener = startUnreadCountListener();
                 }
             });
     } else {
@@ -972,6 +973,12 @@ function generateVerificationCode() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// Проверка введенного кода (ДОБАВЬТЕ ЭТУ ФУНКЦИЮ ЗДЕСЬ)
+function verifyCode1(inputCode) {
+    if (!emailVerificationCode || !inputCode) return false;
+    return inputCode === emailVerificationCode;
+}
+
 // Отправка кода подтверждения на email
 async function sendVerificationCode(email, userName) {
     const code = generateVerificationCode();
@@ -1034,9 +1041,4 @@ function toggleVerificationSection(show) {
         verifySection.style.display = 'none';
         registerBtn.textContent = 'Зарегистрироваться';
     }
-}
-
-// Проверка введенного кода
-function verifyCode(inputCode) {
-    return inputCode === emailVerificationCode;
 }
