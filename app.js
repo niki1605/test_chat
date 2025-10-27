@@ -570,29 +570,12 @@ function loadMessages(otherUserId) {
                 return;
             }
             
-            // Обрабатываем все изменения
-            snapshot.docChanges().forEach((change) => {
-                const message = change.doc.data();
-                
-                if (change.type === 'added' || change.type === 'modified') {
-                    displayMessage(message);
-                    
-                    // Уведомления только для НОВЫХ сообщений от других пользователей
-                    if (change.type === 'added' && 
-                        message.senderId !== currentUser.uid) {
-                        
-                        // Проверяем что сообщение свежее (не старше 10 секунд)
-                        const isNew = message.timestamp && 
-                            message.timestamp.toDate() > new Date(Date.now() - 10000);
-                        
-                        if (isNew) {
-                            console.log("🆕 Новое сообщение для уведомления");
-                            showMessageNotification(message);
-                        }
-                    }
-                }
+            snapshot.forEach((doc) => {
+                const message = doc.data();
+                displayMessage(message);
             });
             
+            // Автоматическая прокрутка к последнему сообщению
             scrollToBottom();
         });
 }
@@ -640,7 +623,7 @@ function displayMessage(message) {
 
 // Отправка сообщения
 function sendMessage() {
-        if (!selectedChatUser || !messageInput.value.trim()) return;
+    if (!selectedChatUser || !messageInput.value.trim()) return;
     
     const messageText = messageInput.value.trim();
     const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
@@ -662,6 +645,9 @@ function sendMessage() {
         .then((docRef) => {
             messageInput.value = '';
             
+              // Отправка email уведомления
+              sendEmailNotification(selectedChatUser, messageText);
+
             // Обновляем последнее сообщение в чате
             db.collection('chats').doc(chatId).update({
                 lastMessage: messageText,
@@ -679,9 +665,6 @@ function sendMessage() {
                     });
             }, 1000);
             
-            // Отправляем EMAIL уведомление
-            //sendEmailNotification(selectedChatUser, messageText);
-            
             // Фокус остается на поле ввода
             messageInput.focus();
         })
@@ -690,102 +673,52 @@ function sendMessage() {
         });
 }
 
-// Функция показа уведомления
-function showMessageNotification(message) {
-
-  if (!isWindowFocused()) {
-        playNotificationSound(); // Звук только если страница неактивна
-    }
-
-    if (!("Notification" in window) || Notification.permission !== "granted") {
-        return;
-    }
+// Отправка уведомления на email
+function sendEmailNotification(recipient, messageText) {
     
-    // Проверяем активен ли чат с этим пользователем
-    if (selectedChatUser && selectedChatUser.id === message.senderId) {
-        return; // Не показываем если чат открыт
-    }
-    
-    // Проверяем активно ли окно
-    if (document.hasFocus()) {
-        return; // Не показываем если пользователь на сайте
-    }
-    
-    const notification = new Notification(`💬 ${message.senderName}`, {
-        body: message.text.length > 50 ? message.text.substring(0, 50) + "..." : message.text,
-        icon: "/favicon.ico",
-        badge: "/favicon.ico",
-        tag: message.id, // Для группировки уведомлений
-        requireInteraction: false,
-        silent: false
-    });
-    
-    // При клике на уведомление открываем чат
-    notification.onclick = () => {
-        window.focus();
-        // Находим пользователя в списке и открываем чат
-        const userItem = document.querySelector(`[data-user-id="${message.senderId}"]`);
-        if (userItem) {
-            userItem.click();
-        }
-        notification.close();
+    const emailParams = {
+        to_email: recipient.email,
+        to_name: recipient.name,
+        from_name: currentUser.name,
+        message: messageText,
+        app_name: "SAS Messenger",
+        reply_to: currentUser.email
     };
     
-    // Автоматическое закрытие через 5 секунд
-    setTimeout(() => {
-        notification.close();
-    }, 5000);
-}
-
-
-// Слушатель изменения видимости
-document.addEventListener('visibilitychange', function() {
-    if (document.hidden) {
-        console.log("Страница неактивна - уведомления будут показаны");
+    // Используем EmailJS если доступен
+    if (typeof emailjs !== 'undefined') {
+        emailjs.send('service_lebtcym', 'template_7ppymg8', emailParams)
+            .then(function(response) {
+                console.log('Email уведомление отправлено!', response.status);
+            }, function(error) {
+                console.log('Ошибка отправки email:', error);
+                //sendFallbackEmail(recipient, messageText);
+            });
     } else {
-        console.log("Страница активна - уведомления скрыты");
-    }
-});
-
-
-function onFirstMessageReceived() {
-    if (Notification.permission === "default") {
-        // Вежливый запрос при первом сообщении
-        setTimeout(() => {
-            if (confirm("Хотите получать уведомления о новых сообщениях?")) {
-                requestNotificationPermission();
-            }
-        }, 1000);
+        // Fallback метод
+        console.log('Ошибка инициализации:', error);
+        //sendFallbackEmail(recipient, messageText);
     }
 }
 
 
+// Fallback метод отправки email
+function sendFallbackEmail(recipient, messageText) {
+    const subject = `SAS Messenger: Новое сообщение от ${currentUser.name}`;
+    const body = `Здравствуйте, ${recipient.name}!
 
-// Запрос разрешения на уведомления
-function requestNotificationPermission() {
-    if (!("Notification" in window)) {
-        console.log("Браузер не поддерживает уведомления");
-        return;
-    }
+Вам пришло новое сообщение в SAS Messenger от ${currentUser.name}:
+
+"${messageText.substring(0, 200)}"
+
+Чтобы ответить на сообщение, перейдите в приложение SAS Messenger.
+
+С уважением,
+SAS Messenger Team`;
     
-    if (Notification.permission === "default") {
-        Notification.requestPermission().then(permission => {
-            console.log("Результат запроса уведомлений:", permission);
-            if (permission === "granted") {
-                console.log("✅ Уведомления разрешены!");
-            }
-        });
-    }
-}
-
-// Приветственное уведомление
-function showWelcomeNotification() {
-    if (Notification.permission === "granted") {
-        new Notification("SAS Messenger", {
-            body: "Теперь вы будете получать уведомления о новых сообщениях",
-            icon: "/favicon.ico"
-        });
-    }
+    // Открываем почтовый клиент (пользователь должен сам отправить)
+    const mailtoLink = `mailto:${recipient.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoLink, '_blank');
 }
 
 // Пометить сообщения как прочитанные
@@ -954,11 +887,6 @@ auth.onAuthStateChanged((user) => {
                         email: user.email,
                         ...userData
                     };
-
-               // Запрашиваем уведомления через 3 секунды после входа
-        setTimeout(() => {
-            requestNotificationPermission();
-        }, 3000);
                     
                     userNameSpan.textContent = userData.name;
                     
