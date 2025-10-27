@@ -680,6 +680,28 @@ function showMessageNotification(message) {
         playNotificationSound(); // Звук только если страница неактивна
     }
 
+if (!("Notification" in window)) {
+        console.error("❌ Notification API не поддерживается");
+        return;
+    }
+    
+    if (Notification.permission !== "granted") {
+        console.log("❌ Нет разрешения на уведомления");
+        return;
+    }
+    
+    // Проверяем активен ли чат с этим пользователем
+    if (selectedChatUser && selectedChatUser.id === message.senderId) {
+        console.log("✅ Чат активен - уведомление не показываем");
+        return;
+    }
+    
+    // Проверяем активно ли окно
+    if (document.hasFocus()) {
+        console.log("✅ Окно активно - уведомление не показываем");
+        return;
+    }
+    
     if (!("Notification" in window) || Notification.permission !== "granted") {
         return;
     }
@@ -693,6 +715,7 @@ function showMessageNotification(message) {
     if (document.hasFocus()) {
         return; // Не показываем если пользователь на сайте
     }
+    
     
     const notification = new Notification(`💬 ${message.senderName}`, {
         body: message.text.length > 50 ? message.text.substring(0, 50) + "..." : message.text,
