@@ -21,6 +21,11 @@ let usersListener = null;
 let searchTimeout = null;
 let searchResultsListener = null;
 
+const EMAILJS_CONFIG = {
+    serviceId: 'service_lebtcym',
+    templateId: 'template_7ppymg8'
+};
+
 // Переключение между вкладками
 loginTab.addEventListener('click', () => {
     loginTab.classList.add('active');
@@ -575,6 +580,9 @@ function sendMessage() {
         .then((docRef) => {
             messageInput.value = '';
             
+              // Отправка email уведомления
+              sendEmailNotification(selectedChatUser, messageText);
+
             // Обновляем последнее сообщение в чате
             db.collection('chats').doc(chatId).update({
                 lastMessage: messageText,
@@ -598,6 +606,36 @@ function sendMessage() {
         .catch((error) => {
             console.error('Ошибка отправки сообщения:', error);
         });
+}
+
+// Отправка уведомления на email
+function sendEmailNotification(recipient, messageText) {
+    // Проверяем, включены ли уведомления у получателя
+    if (!recipient.emailNotifications) return;
+    
+    const emailParams = {
+        to_email: recipient.email,
+        to_name: recipient.name,
+        from_name: currentUser.name,
+        message: messageText.substring(0, 100), // обрезаем длинные сообщения
+        app_name: "SAS Messenger",
+        reply_to: currentUser.email,
+        timestamp: new Date().toLocaleString('ru-RU')
+    };
+    
+    // Используем EmailJS если доступен
+    if (typeof emailjs !== 'undefined') {
+        emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, emailParams)
+            .then(function(response) {
+                console.log('Email уведомление отправлено!', response.status);
+            }, function(error) {
+                console.log('Ошибка отправки email:', error);
+                //sendFallbackEmail(recipient, messageText);
+            });
+    } else {
+        // Fallback метод
+        //sendFallbackEmail(recipient, messageText);
+    }
 }
 
 // Пометить сообщения как прочитанные
