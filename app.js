@@ -25,6 +25,8 @@ let emailVerificationCode = null;
 let verificationTimer = null;
 let resendTimeout = null;
 let unreadCountListener = null;
+let forgotPasswordModal = null;
+let changeNameModal = null;
 
 // Переключение между вкладками
 loginTab.addEventListener('click', () => {
@@ -907,6 +909,7 @@ auth.onAuthStateChanged((user) => {
                     unreadCountListener = startUnreadCountListener();
                 }
             });
+            initSimpleModals();
     } else {
         // Пользователь вышел из системы
         currentUser = null;
@@ -1040,5 +1043,173 @@ function toggleVerificationSection(show) {
     } else {
         verifySection.style.display = 'none';
         registerBtn.textContent = 'Зарегистрироваться';
+    }
+}
+
+
+// Инициализация модальных окон
+function initSimpleModals() {
+    // Модальное окно восстановления пароля
+    forgotPasswordModal = document.getElementById('forgot-password-modal');
+    const forgotPasswordLink = document.getElementById('forgot-password-link');
+    const closeForgotPassword = forgotPasswordModal.querySelector('.close');
+    
+    forgotPasswordLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        forgotPasswordModal.style.display = 'block';
+    });
+    
+    closeForgotPassword.addEventListener('click', () => {
+        forgotPasswordModal.style.display = 'none';
+        document.getElementById('reset-message').style.display = 'none';
+    });
+    
+    // Модальное окно изменения имени
+    changeNameModal = document.getElementById('change-name-modal');
+    const changeNameBtn = document.getElementById('change-name-btn');
+    const closeChangeName = changeNameModal.querySelector('.close');
+    
+    changeNameBtn.addEventListener('click', () => {
+        document.getElementById('new-name').value = currentUser.name || '';
+        changeNameModal.style.display = 'block';
+    });
+    
+    closeChangeName.addEventListener('click', () => {
+        changeNameModal.style.display = 'none';
+        document.getElementById('name-message').style.display = 'none';
+    });
+    
+    // Закрытие модальных окон при клике вне их
+    window.addEventListener('click', (e) => {
+        if (e.target === forgotPasswordModal) {
+            forgotPasswordModal.style.display = 'none';
+            document.getElementById('reset-message').style.display = 'none';
+        }
+        if (e.target === changeNameModal) {
+            changeNameModal.style.display = 'none';
+            document.getElementById('name-message').style.display = 'none';
+        }
+    });
+}
+
+// Восстановление пароля
+document.getElementById('forgot-password-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const email = document.getElementById('reset-email').value;
+    const messageDiv = document.getElementById('reset-message');
+    
+    try {
+        await auth.sendPasswordResetEmail(email);
+        
+        messageDiv.textContent = 'Ссылка для сброса пароля отправлена на ваш email!';
+        messageDiv.className = 'message success';
+        messageDiv.style.display = 'block';
+        
+        // Очистка формы и закрытие модального окна через 3 секунды
+        setTimeout(() => {
+            forgotPasswordModal.style.display = 'none';
+            document.getElementById('forgot-password-form').reset();
+            messageDiv.style.display = 'none';
+        }, 3000);
+        
+    } catch (error) {
+        let errorMessage = 'Ошибка отправки ссылки для сброса пароля';
+        
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = 'Пользователь с таким email не найден';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'Некорректный email';
+        }
+        
+        messageDiv.textContent = errorMessage;
+        messageDiv.className = 'message error';
+        messageDiv.style.display = 'block';
+    }
+});
+
+// Изменение имени
+document.getElementById('change-name-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const newName = document.getElementById('new-name').value.trim();
+    const messageDiv = document.getElementById('name-message');
+    
+    if (!newName) {
+        messageDiv.textContent = 'Имя не может быть пустым';
+        messageDiv.className = 'message error';
+        messageDiv.style.display = 'block';
+        return;
+    }
+    
+    if (newName === currentUser.name) {
+        messageDiv.textContent = 'Это ваше текущее имя';
+        messageDiv.className = 'message error';
+        messageDiv.style.display = 'block';
+        return;
+    }
+    
+    try {
+        await db.collection('users').doc(currentUser.uid).update({
+            name: newName,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Обновляем текущего пользователя
+        currentUser.name = newName;
+        userNameSpan.textContent = newName;
+        
+        messageDiv.textContent = 'Имя успешно изменено!';
+        messageDiv.className = 'message success';
+        messageDiv.style.display = 'block';
+        
+        // Обновляем имя в активных чатах
+        await updateUserNameInChats(newName);
+        
+        setTimeout(() => {
+            changeNameModal.style.display = 'none';
+            messageDiv.style.display = 'none';
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Ошибка изменения имени:', error);
+        messageDiv.textContent = 'Ошибка изменения имени';
+        messageDiv.className = 'message error';
+        messageDiv.style.display = 'block';
+    }
+});
+
+// Обновление имени пользователя в чатах
+async function updateUserNameInChats(newName) {
+    try {
+        // Получаем все чаты пользователя
+        const chatsSnapshot = await db.collection('chats')
+            .where('participants', 'array-contains', currentUser.uid)
+            .get();
+        
+        const batch = db.batch();
+        
+        for (const chatDoc of chatsSnapshot.docs) {
+            // Обновляем имя в сообщениях
+            const messagesSnapshot = await db.collection('chats')
+                .doc(chatDoc.id)
+                .collection('messages')
+                .where('senderId', '==', currentUser.uid)
+                .get();
+            
+            for (const messageDoc of messagesSnapshot.docs) {
+                const messageRef = db.collection('chats')
+                    .doc(chatDoc.id)
+                    .collection('messages')
+                    .doc(messageDoc.id);
+                batch.update(messageRef, { senderName: newName });
+            }
+        }
+        
+        await batch.commit();
+        console.log('Имя обновлено во всех чатах');
+        
+    } catch (error) {
+        console.error('Ошибка обновления имени в чатах:', error);
     }
 }

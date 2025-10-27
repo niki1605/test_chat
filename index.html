@@ -35,6 +35,9 @@
                     <button type="submit">Войти</button>
                 </form>
                 <div class="message" id="login-message"></div>
+                <div class="form-footer">
+    <a href="#" id="forgot-password-link">Забыли пароль?</a>
+</div>
             </div>
 
             <div class="form-container" id="register-form">
@@ -70,7 +73,37 @@
     <div class="message" id="register-message"></div>
             </div>
         </div>
+<!-- Модальное окно восстановления пароля -->
+<div id="forgot-password-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Восстановление пароля</h3>
+        <form id="forgot-password-form">
+            <div class="form-group">
+                <label for="reset-email">Email</label>
+                <input type="email" id="reset-email" required>
+            </div>
+            <button type="submit">Отправить ссылку для сброса</button>
+        </form>
+        <div class="message" id="reset-message"></div>
+    </div>
+</div>
 
+<!-- Модальное окно изменения имени -->
+<div id="change-name-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Изменение имени</h3>
+        <form id="change-name-form">
+            <div class="form-group">
+                <label for="new-name">Новое имя</label>
+                <input type="text" id="new-name" required>
+            </div>
+            <button type="submit">Сохранить имя</button>
+        </form>
+        <div class="message" id="name-message"></div>
+    </div>
+</div>
         <!-- Основной интерфейс после входа -->
         <div class="main-app" id="main-app" style="display: none;">
             <!-- Шапка с информацией о пользователе -->
@@ -80,6 +113,9 @@
                 </div>
                 <div class="user-info">
                     <span>Привет, <span id="user-name"></span>!</span>
+                    <div class="header-actions">
+    <button id="change-name-btn" class="change-name-btn">✏️ Изменить имя</button>
+</div>
                     <button id="logout-btn" class="logout-btn">Выйти</button>
                 </div>
             </div>
