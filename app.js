@@ -409,15 +409,28 @@ function addUserToActiveChats(userId, userData) {
 
 // Очистка поиска
 function clearSearch() {
-    document.getElementById('user-search').value = '';
-    document.getElementById('search-results').innerHTML = '';
+    const searchInput = document.getElementById('user-search');
+    const searchResults = document.getElementById('search-results');
+    
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    
+    if (searchResults) {
+        searchResults.innerHTML = '';
+    }
     
     if (searchTimeout) {
         clearTimeout(searchTimeout);
+        searchTimeout = null;
     }
+    
     if (searchResultsListener) {
         searchResultsListener();
+        searchResultsListener = null;
     }
+    
+    console.log('✅ Поиск очищен');
 }
 
 // Загрузка пользователей с активными чатами (ИСПРАВЛЕННАЯ ВЕРСИЯ)
@@ -701,219 +714,255 @@ function sendMessage() {
         });
 }
 
-function initLongPressSimple() {
-    const contextMenu = document.getElementById('message-context-menu');
-    let pressTimer;
-    let longPressTarget = null;
-
-    // 🔥 ОСНОВНАЯ ФУНКЦИЯ LONG PRESS
-    function startLongPress(e, target) {
-        if (isEditingMessage) return;
-
-        const messageItem = target.closest('.message-item.own');
-        
-        if (messageItem && !messageItem.classList.contains('deleted')) {
-            // 🔥 СОХРАНЯЕМ ЦЕЛЕВОЙ ЭЛЕМЕНТ
-            longPressTarget = messageItem;
-            
-            pressTimer = setTimeout(() => {
-                showContextMenuForMessage(messageItem, e);
-            }, 600); // 600ms - оптимальное время для мобильных
-        }
+function deleteMessage(messageId, chatId) {
+    if (!messageId || !chatId) {
+        console.error('❌ deleteMessage: messageId или chatId не определены');
+        return;
     }
 
-    function endLongPress() {
-        clearTimeout(pressTimer);
-    }
-
-    // 🔥 ПОКАЗ КОНТЕКСТНОГО МЕНЮ
-    function showContextMenuForMessage(messageItem, e) {
-        const messageId = messageItem.dataset.messageId;
-        const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
-        const messageText = messageItem.querySelector('.message-text').textContent;
-        
-        contextMenu.dataset.messageId = messageId;
-        contextMenu.dataset.chatId = chatId;
-        contextMenu.dataset.messageText = messageText;
-        
-        // 🔥 ПОЗИЦИОНИРОВАНИЕ ДЛЯ МОБИЛЬНЫХ
-        let clientX, clientY;
-        
-        if (e.touches && e.touches[0]) {
-            // Touch events
-            clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
-        } else {
-            // Mouse events (fallback)
-            clientX = e.clientX;
-            clientY = e.clientY;
-        }
-        
-        // Центрируем меню на мобильных
-        const menuWidth = 200;
-        const menuHeight = 120;
-        
-        contextMenu.style.left = '50%';
-        contextMenu.style.top = '50%';
-        contextMenu.style.transform = 'translate(-50%, -50%)';
-        contextMenu.style.display = 'block';
-        
-        // Подсвечиваем сообщение
-        messageItem.style.background = 'rgba(255, 235, 59, 0.2)';
-        
-        console.log("📱 Контекстное меню открыто");
-    }
-
-    // 🔥 ФУНКЦИЯ СКРЫТИЯ МЕНЮ
-    function hideContextMenu() {
-        contextMenu.style.display = 'none';
-        
-        if (longPressTarget) {
-            longPressTarget.style.background = '';
-            longPressTarget = null;
-        }
-    }
-
-    // 🔥 ОБРАБОТЧИКИ TOUCH СОБЫТИЙ (ДЛЯ РЕАЛЬНЫХ МОБИЛЬНЫХ)
-    document.addEventListener('touchstart', function(e) {
-        startLongPress(e, e.target);
-    }, { passive: true }); // 🔥 ВАЖНО: passive: true для производительности
-
-    document.addEventListener('touchend', function() {
-        endLongPress();
-    }, { passive: true });
-
-    document.addEventListener('touchmove', function() {
-        endLongPress(); // Отменяем long press при движении пальца
-    }, { passive: true });
-
-    // 🔥 ОБРАБОТЧИКИ МЫШИ (ДЛЯ ПК)
-    document.addEventListener('mousedown', function(e) {
-        startLongPress(e, e.target);
-    });
-
-    document.addEventListener('mouseup', function() {
-        endLongPress();
-    });
-
-    // 🔥 ЗАКРЫТИЕ МЕНЮ ПРИ КЛИКЕ ВНЕ ЕГО
-    document.addEventListener('click', function(e) {
-        if (isEditingMessage) return;
-        
-        if (contextMenu.style.display === 'block' && 
-            !contextMenu.contains(e.target) && 
-            !e.target.closest('.message-item.own')) {
-            hideContextMenu();
-        }
-    });
-
-    // 🔥 ОБРАБОТЧИК ДЛЯ КОНТЕКСТНОГО МЕНЮ
-    contextMenu.addEventListener('click', function(e) {
-        if (e.target.classList.contains('context-menu-item')) {
-            const action = e.target.dataset.action;
-            const messageId = this.dataset.messageId;
-            const chatId = this.dataset.chatId;
-            const messageText = this.dataset.messageText;
-            
-            if (action === 'edit') {
-                editMessage(messageId, chatId, messageText);
-            } else if (action === 'copy') {
-                copyMessageText(messageText);
-            } else if (action === 'delete') {
-                deleteMessage(messageId, chatId);
-            }
-            
-            hideContextMenu();
-        }
-    });
-
-    console.log("✅ Long press инициализирован для мобильных устройств");
-}
-
-// 🔥 ОБРАБОТЧИК КЛИКОВ В КОНТЕКСТНОМ МЕНЮ
-function handleContextMenuClick(e) {
-    if (e.target.classList.contains('context-menu-item')) {
-        const action = e.target.dataset.action;
-        const messageId = this.dataset.messageId;
-        const chatId = this.dataset.chatId;
-        const messageText = this.dataset.messageText;
-        
-        console.log(`🔘 Действие: ${action} для сообщения ${messageId}`);
-        
-        if (action === 'edit') {
-            editMessage(messageId, chatId, messageText);
-        } else if (action === 'copy') {
-            copyMessageText(messageText);
-        } else if (action === 'delete') {
-            deleteMessage(messageId, chatId);
-        }
-        
-        hideContextMenu();
-    }
-}
-
-// Функция удаления сообщения
-async function deleteMessage(messageId, chatId) {
-     if (!messageId || !chatId) return;
-    
     if (!confirm("Удалить это сообщение навсегда?")) {
         return;
     }
-    
+
+    // 🔥 ПРОВЕРЯЕМ ЧТО ФУНКЦИИ СУЩЕСТВУЮТ
+    if (typeof showTempMessage === 'undefined') {
+        console.error('❌ showTempMessage не определена');
+        alert('Сообщение удалено');
+    }
+
     try {
-        const messageDoc = await db.collection('chats')
-            .doc(chatId)
-            .collection('messages')
-            .doc(messageId)
-            .get();
-        
-        if (!messageDoc.exists) {
-            showTempMessage("Сообщение не найдено", "error");
-            return;
-        }
-        
-        const messageData = messageDoc.data();
-        
-        if (messageData.senderId !== currentUser.uid) {
-            showTempMessage("Нельзя удалить чужое сообщение", "error");
-            return;
-        }
-        
-        // 🔥 МГНОВЕННО СКРЫВАЕМ сообщение из интерфейса
+        // Мгновенно скрываем сообщение из интерфейса
         const messageElement = document.querySelector(`.message-item[data-message-id="${messageId}"]`);
         if (messageElement) {
-            messageElement.classList.add('hiding');
+            messageElement.style.opacity = '0.5';
+            messageElement.style.textDecoration = 'line-through';
+            messageElement.style.background = '#f8f9fa !important';
+            
+            // Через анимацию полностью скрываем
             setTimeout(() => {
                 if (messageElement.parentNode) {
                     messageElement.parentNode.removeChild(messageElement);
                 }
             }, 300);
         }
-        
-        // 🔥 ПОЛНОСТЬЮ УДАЛЯЕМ из базы данных
-        await db.collection('chats')
+
+        // Удаляем из базы данных
+        db.collection('chats')
             .doc(chatId)
             .collection('messages')
             .doc(messageId)
-            .delete();
+            .delete()
+            .then(() => {
+                console.log("✅ Сообщение удалено из базы данных");
+                
+                if (typeof showTempMessage !== 'undefined') {
+                    showTempMessage("Сообщение удалено навсегда");
+                }
+                
+                // Обновляем последнее сообщение в чате
+                updateLastMessageInChat(chatId);
+                
+                // Отменяем email уведомление если есть
+                if (currentEmailMessageId === messageId && currentEmailChatId === chatId) {
+                    hideEmailNotification();
+                    if (typeof showTempMessage !== 'undefined') {
+                        showTempMessage("Сообщение удалено - email отменен", "success");
+                    }
+                }
+            })
+            .catch((error) => {
+                console.error('❌ Ошибка удаления сообщения:', error);
+                if (typeof showTempMessage !== 'undefined') {
+                    showTempMessage("Ошибка при удалении", "error");
+                }
+                
+                // Восстанавливаем сообщение в интерфейсе при ошибке
+                if (messageElement) {
+                    messageElement.style.opacity = '';
+                    messageElement.style.textDecoration = '';
+                    messageElement.style.background = '';
+                }
+            });
+
+    } catch (error) {
+        console.error('❌ Ошибка в deleteMessage:', error);
+        if (typeof showTempMessage !== 'undefined') {
+            showTempMessage("Ошибка при удалении", "error");
+        }
+    }
+}
+
+
+
+function initLongPressSimple() {
+      const contextMenu = document.getElementById('message-context-menu');
+    
+    // Создаем меню если не существует
+    if (!contextMenu) {
+        showContextMenu();
+        return;
+    }
+
+    let pressTimer = null;
+    let currentMessageElement = null;
+
+    // Функция показа контекстного меню
+    function showContextMenu(messageElement, x, y) {
+        // Проверяем что выбран чат
+        if (!selectedChatUser || !selectedChatUser.id) {
+            showTempMessage("Сначала выберите собеседника", "info");
+            return;
+        }
+
+        const messageId = messageElement.dataset.messageId;
+        const messageText = messageElement.querySelector('.message-text')?.textContent || '';
         
-        console.log("✅ Сообщение полностью удалено из базы данных");
+        // Сохраняем данные в меню
+        contextMenu.dataset.messageId = messageId;
+        contextMenu.dataset.messageText = messageText;
         
-        // 🔥 Отменяем email уведомление если есть
-        if (currentEmailMessageId === messageId && currentEmailChatId === chatId) {
-            hideEmailNotification();
-            showTempMessage("Сообщение удалено - email отменен", "success");
-        } else {
-            showTempMessage("Сообщение удалено навсегда");
+        // Позиционируем меню
+        positionContextMenu(x, y);
+        
+        // Показываем меню
+        contextMenu.style.display = 'block';
+        currentMessageElement = messageElement;
+        
+        // Подсвечиваем сообщение
+        messageElement.style.backgroundColor = 'rgba(255, 235, 59, 0.3)';
+    }
+
+    // Функция позиционирования меню
+    function positionContextMenu(x, y) {
+        const menuWidth = 200;
+        const menuHeight = 120;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        // Корректируем позицию чтобы меню не выходило за границы экрана
+        let posX = x;
+        let posY = y;
+
+        if (x + menuWidth > viewportWidth) {
+            posX = viewportWidth - menuWidth - 10;
+        }
+        if (y + menuHeight > viewportHeight) {
+            posY = viewportHeight - menuHeight - 10;
+        }
+
+        contextMenu.style.left = posX + 'px';
+        contextMenu.style.top = posY + 'px';
+    }
+
+    // Функция скрытия меню
+    function hideContextMenu() {
+        if (contextMenu.style.display === 'block') {
+            contextMenu.style.display = 'none';
+            
+            // Убираем подсветку с сообщения
+            if (currentMessageElement) {
+                currentMessageElement.style.backgroundColor = '';
+                currentMessageElement = null;
+            }
         }
         
-        // 🔥 ОБНОВЛЯЕМ последнее сообщение в чате
-        await updateLastMessageInChat(chatId);
-        
-    } catch (error) {
-        console.error('❌ Ошибка удаления сообщения:', error);
-        showTempMessage("Ошибка при удалении", "error");
+        // Очищаем таймер
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
     }
+
+    // Обработчик начала удержания
+    function handlePressStart(e, target) {
+        // Ищем элемент сообщения
+        const messageElement = target.closest('.message-item.own');
+        if (!messageElement) return;
+
+        // Проверяем что сообщение не удалено
+        if (messageElement.classList.contains('deleted')) return;
+
+        // Получаем координаты
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        // Запускаем таймер для показа меню
+        pressTimer = setTimeout(() => {
+            showContextMenu(messageElement, clientX, clientY);
+        }, 500); // 500ms для удержания
+    }
+
+    // Обработчик окончания удержания
+    function handlePressEnd() {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+    }
+
+    // Обработчики для touch устройств
+    document.addEventListener('touchstart', function(e) {
+        handlePressStart(e, e.target);
+    }, { passive: true });
+
+    document.addEventListener('touchend', handlePressEnd, { passive: true });
+    document.addEventListener('touchmove', handlePressEnd, { passive: true });
+    document.addEventListener('touchcancel', handlePressEnd, { passive: true });
+
+    // Обработчики для мыши
+    document.addEventListener('mousedown', function(e) {
+        if (e.button === 0) { // Левая кнопка мыши
+            handlePressStart(e, e.target);
+        }
+    });
+
+    document.addEventListener('mouseup', handlePressEnd);
+    document.addEventListener('mousemove', handlePressEnd);
+
+    // Закрытие меню при клике вне его
+    document.addEventListener('click', function(e) {
+        if (contextMenu.style.display === 'block' && 
+            !contextMenu.contains(e.target) &&
+            !e.target.closest('.message-item.own')) {
+            hideContextMenu();
+        }
+    });
+
+    // Закрытие меню при нажатии Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && contextMenu.style.display === 'block') {
+            hideContextMenu();
+        }
+    });
+
+    // Обработчик действий в контекстном меню
+    contextMenu.addEventListener('click', function(e) {
+        const menuItem = e.target.closest('.context-menu-item');
+        if (!menuItem) return;
+
+        const action = menuItem.dataset.action;
+        const messageId = contextMenu.dataset.messageId;
+        const messageText = contextMenu.dataset.messageText;
+
+        // Создаем chatId для действий
+        const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
+
+        switch (action) {
+            case 'edit':
+                editMessage(messageId, chatId, messageText);
+                break;
+            case 'copy':
+                copyMessageText(messageText);
+                break;
+            case 'delete':
+                deleteMessage(messageId, chatId);
+                break;
+        }
+
+        hideContextMenu();
+    });
+
+    console.log("✅ Контекстное меню инициализировано");
 }
 
 // Функция для показа временных сообщений
@@ -1032,7 +1081,7 @@ function initContextMenuHandlers() {
             } else if (action === 'copy') {
                 copyMessageText(messageText);
             } else if (action === 'delete') {
-                deleteMessage(messageId, chatId);
+                //deleteMessage(messageId, chatId);
             }
             
             hideContextMenu();
@@ -1473,15 +1522,55 @@ document.getElementById('user-search').addEventListener('input', (e) => {
 // Добавление кнопки очистки поиска
 function addClearSearchButton() {
     const searchContainer = document.querySelector('.search-container');
+    
+    if (!searchContainer) {
+        console.error('❌ searchContainer не найден');
+        return;
+    }
+
+    // 🔥 ПРОВЕРЯЕМ, ЕСТЬ ЛИ УЖЕ КНОПКА
+    const existingClearBtn = document.getElementById('clear-search');
+    if (existingClearBtn) {
+        console.log('✅ Кнопка очистки уже существует');
+        return;
+    }
+
     const clearBtn = document.createElement('button');
     clearBtn.id = 'clear-search';
     clearBtn.textContent = '×';
     clearBtn.title = 'Очистить поиск';
-    clearBtn.style.padding = '10px';
-    clearBtn.style.background = '#6c757d';
+    clearBtn.style.cssText = `
+        padding: 10px 12px;
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        min-height: auto;
+        font-size: 16px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+
+    // Добавляем hover эффекты
+    clearBtn.addEventListener('mouseenter', () => {
+        clearBtn.style.background = '#5a6268';
+    });
     
-    clearBtn.addEventListener('click', clearSearch);
+    clearBtn.addEventListener('mouseleave', () => {
+        clearBtn.style.background = '#6c757d';
+    });
+
+    clearBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        clearSearch();
+    });
+
     searchContainer.appendChild(clearBtn);
+    console.log('✅ Кнопка очистки поиска добавлена');
 }
 
 
@@ -1492,7 +1581,7 @@ function initContextMenu() {
 
 // Отслеживание состояния аутентификации
 auth.onAuthStateChanged((user) => {
-    if (user) {
+   if (user) {
         // Пользователь вошел в систему
         db.collection('users').doc(user.uid).get()
             .then((doc) => {
@@ -1503,66 +1592,84 @@ auth.onAuthStateChanged((user) => {
                         email: user.email,
                         ...userData
                     };
-                    
- initContextMenu(); // Инициализируем контекстное меню
 
-// Инициализируем мобильное меню
-        initMobileMenu();
-        handleResize();
-        
-        // Слушаем изменения размера окна
-        window.addEventListener('resize', handleResize);
+                    // 🔥 СБРАСЫВАЕМ СОСТОЯНИЕ ЧАТА ПРИ КАЖДОМ ВХОДЕ
+                    resetChatState();
 
- // Инициализируем удержание (простая версия)
-        setTimeout(() => {
-            initLongPressSimple(); // ← Используйте эту функцию
-        }, 1000);
+                    initContextMenu();
+                    initMobileMenu();
+                    handleResize();
+
+                    // Слушаем изменения размера окна
+                    window.addEventListener('resize', handleResize);
 
                     userNameSpan.textContent = userData.name;
-                    
+
                     // Переключение на основной интерфейс
                     authSection.style.display = 'none';
                     mainApp.style.display = 'grid';
-                    
+
                     // Загрузка активных чатов
                     loadActiveChats();
-                    
+
                     // Добавление кнопки очистки поиска
                     addClearSearchButton();
-                    
+
                     // Обновление статуса онлайн
                     db.collection('users').doc(user.uid).update({
                         online: true,
                         lastSeen: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    
+
                     unreadCountListener = startUnreadCountListener();
                 }
             });
-            initSimpleModals();
+        initSimpleModals();
     } else {
         // Пользователь вышел из системы
         currentUser = null;
-        selectedChatUser = null;
         
+        // 🔥 ПОЛНЫЙ СБРОС СОСТОЯНИЯ ПРИ ВЫХОДЕ
+        resetChatState();
+        selectedChatUser = null;
+
         // Остановка слушателей
         if (messagesListener) {
             messagesListener();
+            messagesListener = null;
         }
         if (usersListener) {
             usersListener();
+            usersListener = null;
         }
         if (searchResultsListener) {
             searchResultsListener();
+            searchResultsListener = null;
         }
         if (unreadCountListener) {
-    unreadCountListener(); // Добавьте эту строку
-}
-        
+            unreadCountListener();
+            unreadCountListener = null;
+        }
+
+        // Закрываем мобильную панель если открыта
+        const usersPanel = document.querySelector('.users-panel');
+        const menuToggle = document.querySelector('.menu-toggle');
+        if (usersPanel) {
+            usersPanel.classList.remove('active');
+            usersPanel.style.cssText = '';
+        }
+        if (menuToggle) {
+            menuToggle.classList.remove('active');
+            menuToggle.innerHTML = '☰';
+            menuToggle.style.cssText = '';
+        }
+
+        document.body.style.overflow = '';
+
         // Переключение на формы авторизации
         mainApp.style.display = 'none';
         authSection.style.display = 'block';
-        
+
         // Очистка форм
         document.getElementById('loginForm').reset();
         document.getElementById('registerForm').reset();
@@ -2051,51 +2158,136 @@ async function sendEmailNow(messageId, chatId) {
 }
 
 function initMobileMenu() {
-    const menuToggle = document.querySelector('.menu-toggle');
+        const menuToggle = document.querySelector('.menu-toggle');
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
-    
-    if (menuToggle && usersPanel) {
-        menuToggle.addEventListener('click', () => {
-            usersPanel.classList.toggle('active');
-            menuToggle.classList.toggle('active');
-            
-            // На мобильных скрываем чат когда открыто меню
-            if (window.innerWidth <= 768) {
-                if (usersPanel.classList.contains('active')) {
-                    chatArea.style.display = 'none';
-                    menuToggle.innerHTML = '✕'; // Иконка закрытия
-                } else {
-                    chatArea.style.display = 'flex';
-                    menuToggle.innerHTML = '☰'; // Иконка меню
-                }
-            }
-        });
-        
-        // Закрываем меню при выборе пользователя на мобильных
-        document.addEventListener('click', (e) => {
-            if (window.innerWidth <= 768 && 
-                usersPanel.classList.contains('active') &&
-                e.target.closest('.user-item')) {
-                usersPanel.classList.remove('active');
-                menuToggle.classList.remove('active');
-                chatArea.style.display = 'flex';
-                menuToggle.innerHTML = '☰';
-            }
-        });
+    const mainApp = document.getElementById('main-app');
+
+    if (!menuToggle || !usersPanel || !chatArea) {
+        console.error('❌ Элементы мобильного меню не найдены');
+        return;
     }
+
+    menuToggle.addEventListener('click', () => {
+        const isOpening = !usersPanel.classList.contains('active');
+        
+        if (isOpening) {
+            // Открываем панель на весь экран
+            openFullscreenPanel();
+        } else {
+            // Закрываем панель
+            closeFullscreenPanel();
+        }
+    });
+
+    // Функция открытия панели на весь экран
+    function openFullscreenPanel() {
+         usersPanel.classList.add('active');
+    menuToggle.classList.add('active');
+    menuToggle.innerHTML = '✕';
+    menuToggle.style.position = 'fixed';
+    menuToggle.style.top = '15px';
+    menuToggle.style.left = '15px';
+    menuToggle.style.zIndex = '1002';
+    menuToggle.style.background = '#2575fc';
+    menuToggle.style.color = 'white';
+    
+    // Панель на весь экран, но оставляем место для header
+    usersPanel.style.cssText = `
+        position: fixed;
+        top: 60px; /* 🔥 ОСТАВЛЯЕМ МЕСТО ДЛЯ HEADER */
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: calc(100vh - 60px); /* 🔥 ВЫЧИТАЕМ ВЫСОТУ HEADER */
+        background: white;
+        z-index: 1001;
+        display: block !important;
+        overflow-y: auto;
+        padding: 20px;
+    `;
+    
+    // Header должен быть поверх панели
+    const header = document.querySelector('.header');
+    if (header) {
+        header.style.zIndex = '1003'; /* 🔥 HEADER ПОВЫШЕ */
+        header.style.position = 'relative'; /* 🔥 ЧТОБЫ БЫЛ ВИДИМ */
+    }
+    
+    // Скрываем чат
+    chatArea.style.display = 'none';
+    
+    // Блокируем скролл body
+    document.body.style.overflow = 'hidden';
+    }
+
+    // Функция закрытия панели
+    function closeFullscreenPanel() {
+        usersPanel.classList.remove('active');
+    menuToggle.classList.remove('active');
+    menuToggle.innerHTML = '☰';
+    menuToggle.style.position = '';
+    menuToggle.style.top = '';
+    menuToggle.style.left = '';
+    menuToggle.style.background = '';
+    menuToggle.style.color = '';
+    
+    // Возвращаем обычные стили
+    usersPanel.style.cssText = '';
+    
+    // Возвращаем header в нормальное состояние
+    const header = document.querySelector('.header');
+    if (header) {
+        header.style.zIndex = '';
+        header.style.position = '';
+    }
+    
+    // Показываем чат
+    chatArea.style.display = 'flex';
+    
+    // Разблокируем скролл body
+    document.body.style.overflow = '';
+    }
+
+    // Закрытие панели при выборе пользователя
+    document.addEventListener('click', (e) => {
+        if (window.innerWidth <= 768 && 
+            usersPanel.classList.contains('active') && 
+            e.target.closest('.user-item')) {
+            closeFullscreenPanel();
+        }
+    });
+
+    // Закрытие панели при клике вне ее (оверлей)
+    usersPanel.addEventListener('click', (e) => {
+        if (e.target === usersPanel) {
+            closeFullscreenPanel();
+        }
+    });
+
+    // Закрытие панели при нажатии Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && usersPanel.classList.contains('active')) {
+            closeFullscreenPanel();
+        }
+    });
+
+    console.log("✅ Мобильное меню инициализировано");
 }
 
 // Обновите обработчик изменения размера окна
 function handleResize() {
-    const menuToggle = document.querySelector('.menu-toggle');
+   const menuToggle = document.querySelector('.menu-toggle');
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
-    
+    const header = document.querySelector('.header');
+
     if (window.innerWidth > 768) {
-        // На десктопе всегда показываем обе панели
+        // Десктоп - показываем обе панели
         if (usersPanel) {
             usersPanel.classList.add('active');
+            usersPanel.style.cssText = '';
             usersPanel.style.display = 'block';
         }
         if (chatArea) {
@@ -2104,14 +2296,111 @@ function handleResize() {
         if (menuToggle) {
             menuToggle.style.display = 'none';
         }
+        if (header) {
+            header.style.zIndex = '';
+            header.style.position = '';
+        }
+        document.body.style.overflow = '';
     } else {
-        // На мобильных скрываем панель пользователей по умолчанию
+        // Мобильные - скрываем панель пользователей
         if (menuToggle) {
             menuToggle.style.display = 'block';
             menuToggle.innerHTML = '☰';
+            menuToggle.style.position = '';
+            menuToggle.style.zIndex = '';
         }
         if (usersPanel) {
             usersPanel.classList.remove('active');
+            usersPanel.style.cssText = '';
+        }
+        if (chatArea) {
+            chatArea.style.display = 'flex';
+        }
+        if (header) {
+            header.style.zIndex = '';
+            header.style.position = '';
         }
     }
 }
+
+function resetChatState() {
+    const messagesContainer = document.getElementById('messages-container');
+    const chatWithUser = document.getElementById('chat-with-user');
+    const messageInput = document.getElementById('message-input');
+    const sendMessageBtn = document.getElementById('send-message-btn');
+
+    // Сбрасываем заголовок чата
+    if (chatWithUser) {
+        chatWithUser.innerHTML = 'Выберите пользователя для общения';
+    }
+
+    // Очищаем сообщения
+    if (messagesContainer) {
+        messagesContainer.innerHTML = '<div class="no-messages">Выберите пользователя для начала общения</div>';
+    }
+
+    // Блокируем поле ввода
+    if (messageInput) {
+        messageInput.disabled = true;
+        messageInput.placeholder = 'Выберите пользователя для общения...';
+        messageInput.value = '';
+    }
+
+    if (sendMessageBtn) {
+        sendMessageBtn.disabled = true;
+    }
+
+    // Сбрасываем выбранного пользователя
+    selectedChatUser = null;
+
+    // Снимаем выделение с пользователей
+    document.querySelectorAll('.user-item').forEach(item => {
+        item.classList.remove('active');
+    });
+
+    // Останавливаем слушатели сообщений
+    if (messagesListener) {
+        messagesListener();
+        messagesListener = null;
+    }
+
+    console.log("✅ Состояние чата сброшено");
+}
+
+const mobileStyles = `
+@media (max-width: 768px) {
+    .users-panel.active {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: white !important;
+        z-index: 1001 !important;
+        display: block !important;
+        overflow-y: auto !important;
+        padding: 60px 20px 20px 20px !important;
+        border-radius: 0 !important;
+    }
+    
+    .menu-toggle.active {
+        position: fixed !important;
+        top: 15px !important;
+        left: 15px !important;
+        z-index: 1002 !important;
+        background: #2575fc !important;
+        color: white !important;
+    }
+    
+    .chat-area {
+        transition: opacity 0.3s ease;
+    }
+}
+`;
+
+// Добавление стилей в страницу
+const styleSheet = document.createElement('style');
+styleSheet.textContent = mobileStyles;
+document.head.appendChild(styleSheet);
