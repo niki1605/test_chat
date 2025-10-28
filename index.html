@@ -111,13 +111,28 @@
                 <div class="app-logo">
                     <span class="logo-text">SAS</span>
                 </div>
-                <div class="user-info">
-                    <span>Привет, <span id="user-name"></span>!</span>
-                    <div class="header-actions">
-    <button id="change-name-btn" class="change-name-btn">✏️ Изменить имя</button>
-</div>
-                    <button id="logout-btn" class="logout-btn">Выйти</button>
+             <div class="header-left">
+        <button class="menu-toggle">☰</button>
+        <div class="user-info">
+            <span id="user-name"></span>
+        </div>
+    </div>
+        <div class="header-actions">
+        <button id="change-name-btn" class="change-name-btn">Имя</button>
+        <button id="logout-btn" class="logout-btn">Выйти</button>
+                   
                 </div>
+
+                <div id="email-notification" class="email-notification" style="display: none;">
+    <div class="notification-content">
+        <span class="notification-icon">⏰</span>
+        <div class="notification-text">
+            <strong>Email уведомление запланировано</strong>
+            <div class="notification-subtitle">Вы можете удалить сообщение в течение 40 секунд чтобы отменить отправку (или изменить(таймер будет на паузе)). Не закрывайте сайт до конца таймера</div>
+        </div>
+        <div class="notification-timer" id="email-timer">60</div>
+    </div>
+</div>
             </div>
 
             <!-- Список пользователей -->
@@ -158,6 +173,21 @@
             </div>
         </div>
     </div>
+
+  <div id="message-context-menu" class="context-menu">
+    <div class="context-menu-item" data-action="edit">
+        <span>✏️</span>
+        Изменить
+    </div>
+    <div class="context-menu-item" data-action="copy">
+        <span>📋</span>
+        Копировать
+    </div>
+    <div class="context-menu-item" data-action="delete">
+        <span>🗑️</span>
+        Удалить
+    </div>
+</div>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>

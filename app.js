@@ -27,6 +27,16 @@ let resendTimeout = null;
 let unreadCountListener = null;
 let forgotPasswordModal = null;
 let changeNameModal = null;
+let longPressTimer;
+let longPressTarget = null;
+
+
+let emailTimerPaused = false;
+let emailTimerPauseTime = null;
+let emailTimerRemaining = null;
+
+// Добавьте в переменные состояния
+let isEditingMessage = false;
 
 // Переключение между вкладками
 loginTab.addEventListener('click', () => {
@@ -484,7 +494,7 @@ function loadActiveChats() {
 
 // Получение последнего сообщения из чата
 async function getLastMessage(otherUserId) {
-    const chatId = [currentUser.uid, otherUserId].sort().join('_');
+   const chatId = [currentUser.uid, otherUserId].sort().join('_');
     
     try {
         const messagesSnapshot = await db.collection('chats')
@@ -496,7 +506,9 @@ async function getLastMessage(otherUserId) {
             
         if (!messagesSnapshot.empty) {
             const lastMessage = messagesSnapshot.docs[0].data();
-            return lastMessage.text;
+            return lastMessage.text.length > 50 ? 
+                   lastMessage.text.substring(0, 50) + '...' : 
+                   lastMessage.text;
         }
         
         return 'Нет сообщений';
@@ -548,14 +560,13 @@ async function selectUserForChat(userId, userData) {
 
 // Загрузка сообщений
 function loadMessages(otherUserId) {
-    // Остановка предыдущего слушателя
+     // Остановка предыдущего слушателя
     if (messagesListener) {
         messagesListener();
     }
     
     messagesContainer.innerHTML = '<div class="no-messages">Загрузка сообщений...</div>';
     
-    // Получение ID чата
     const chatId = [currentUser.uid, otherUserId].sort().join('_');
     
     messagesListener = db.collection('chats')
@@ -566,32 +577,43 @@ function loadMessages(otherUserId) {
             messagesContainer.innerHTML = '';
             
             if (snapshot.empty) {
-                messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Начните общение!</div>';
+                messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений</div>';
                 return;
             }
             
+            // 🔥 Просто отображаем все сообщения - удаленных уже нет в базе!
             snapshot.forEach((doc) => {
                 const message = doc.data();
-                displayMessage(message);
+                const messageId = doc.id;
+                displayMessage(message, messageId);
             });
             
-            // Автоматическая прокрутка к последнему сообщению
             scrollToBottom();
+        }, (error) => {
+            console.error('Ошибка загрузки сообщений:', error);
+            messagesContainer.innerHTML = '<div class="no-messages">Ошибка загрузки сообщений</div>';
         });
 }
 
 // Отображение сообщения
-function displayMessage(message) {
+function displayMessage(message, messageId) {
+     // 🔥 БЕЗОПАСНАЯ ПРОВЕРКА
+    if (typeof messageId === 'undefined') {
+        console.warn('⚠️ messageId не передан в displayMessage');
+        messageId = 'temp-' + Date.now();
+    }
+    
     const messageElement = document.createElement('div');
     messageElement.className = `message-item ${message.senderId === currentUser.uid ? 'own' : 'other'}`;
+    messageElement.dataset.messageId = messageId;
     
     const time = message.timestamp ? message.timestamp.toDate().toLocaleTimeString('ru-RU', {
         hour: '2-digit',
         minute: '2-digit'
     }) : 'только что';
     
-    // Определяем статус сообщения с белыми иконками
-    let statusIcon = '⏰'; // отправлено
+    // Определяем статус сообщения
+    let statusIcon = '⏰';
     let statusText = 'Отправлено';
     
     if (message.delivered) {
@@ -604,11 +626,15 @@ function displayMessage(message) {
         statusText = 'Прочитано';
     }
     
+    // Добавляем пометку "изменено" если сообщение редактировалось
+    const editedBadge = message.edited ? '<span class="edited-badge" style="font-size: 10px; opacity: 0.7; font-style: italic;"> (изменено)</span>' : '';
+    
     messageElement.innerHTML = `
         ${message.senderId !== currentUser.uid ? `<div class="message-sender">${message.senderName}</div>` : ''}
         <div class="message-text">${message.text}</div>
+        <div class="message-edit-container"></div>
         <div class="message-meta">
-            <div class="message-time">${time}</div>
+            <div class="message-time">${time}${editedBadge}</div>
             ${message.senderId === currentUser.uid ? `
                 <div class="message-status">
                     <span class="status-icon ${message.read ? 'read' : message.delivered ? 'delivered' : 'sent'}" 
@@ -623,8 +649,8 @@ function displayMessage(message) {
 
 // Отправка сообщения
 function sendMessage() {
-    if (!selectedChatUser || !messageInput.value.trim()) return;
-    
+     if (!selectedChatUser || !messageInput.value.trim()) return;
+   
     const messageText = messageInput.value.trim();
     const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
     
@@ -634,10 +660,13 @@ function sendMessage() {
         senderName: currentUser.displayName || currentUser.name,
         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
         delivered: false,
-        read: false
+        read: false,
+        emailScheduled: true,
+        emailSent: false,
+        deleted: false,
+        edited: false
     };
     
-    // Сохранение сообщения
     db.collection('chats')
         .doc(chatId)
         .collection('messages')
@@ -645,16 +674,16 @@ function sendMessage() {
         .then((docRef) => {
             messageInput.value = '';
             
-              // Отправка email уведомления
-              sendEmailNotification(selectedChatUser, messageText);
-
+            // 🔥 ЗАПУСКАЕМ уведомление с таймером
+            showEmailNotification(docRef.id, chatId);
+            
             // Обновляем последнее сообщение в чате
             db.collection('chats').doc(chatId).update({
                 lastMessage: messageText,
                 lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
             });
             
-            // Помечаем сообщение как доставленное
+            // Помечаем как доставленное
             setTimeout(() => {
                 db.collection('chats')
                     .doc(chatId)
@@ -665,13 +694,511 @@ function sendMessage() {
                     });
             }, 1000);
             
-            // Фокус остается на поле ввода
             messageInput.focus();
         })
         .catch((error) => {
             console.error('Ошибка отправки сообщения:', error);
         });
 }
+
+function initLongPressSimple() {
+    const contextMenu = document.getElementById('message-context-menu');
+    let pressTimer;
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousedown', handleDocumentClick);
+    document.addEventListener('keydown', handleKeyDown);
+
+    // 🔥 СОЗДАЕМ ОТДЕЛЬНЫЕ ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ ОБРАБОТЧИКАМИ
+    function handleMouseDown(e) {
+        // 🔥 ЕСЛИ ИДЕТ РЕДАКТИРОВАНИЕ - НИЧЕГО НЕ ДЕЛАЕМ
+        if (isEditingMessage) {
+            return;
+        }
+
+        const messageItem = e.target.closest('.message-item.own');
+        
+        if (messageItem && !messageItem.classList.contains('deleted')) {
+            pressTimer = setTimeout(() => {
+                const messageId = messageItem.dataset.messageId;
+                const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
+                const messageText = messageItem.querySelector('.message-text').textContent;
+                
+                contextMenu.dataset.messageId = messageId;
+                contextMenu.dataset.chatId = chatId;
+                contextMenu.dataset.messageText = messageText;
+                
+                contextMenu.style.left = e.clientX + 'px';
+                contextMenu.style.top = e.clientY + 'px';
+                contextMenu.style.display = 'block';
+                
+                messageItem.style.background = 'rgba(255, 235, 59, 0.2)';
+                
+            }, 800);
+        }
+    }
+
+    function handleMouseUp() {
+        if (!isEditingMessage) {
+            clearTimeout(pressTimer);
+        }
+    }
+
+    function handleDocumentClick(e) {
+        // 🔥 ЕСЛИ ИДЕТ РЕДАКТИРОВАНИЕ - НЕ ЗАКРЫВАЕМ
+        if (isEditingMessage) {
+            return;
+        }
+
+        if (!contextMenu.contains(e.target) && 
+            !e.target.closest('.message-item.own') && 
+            contextMenu.style.display === 'block') {
+            hideContextMenu();
+        }
+    }
+
+    function handleKeyDown(e) {
+        // 🔥 ЕСЛИ ИДЕТ РЕДАКТИРОВАНИЕ - НЕ ЗАКРЫВАЕМ
+        if (isEditingMessage) {
+            return;
+        }
+
+        if (e.key === 'Escape' && contextMenu.style.display === 'block') {
+            hideContextMenu();
+        }
+    }
+}
+
+// Функция удаления сообщения
+async function deleteMessage(messageId, chatId) {
+     if (!messageId || !chatId) return;
+    
+    if (!confirm("Удалить это сообщение навсегда?")) {
+        return;
+    }
+    
+    try {
+        const messageDoc = await db.collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .doc(messageId)
+            .get();
+        
+        if (!messageDoc.exists) {
+            showTempMessage("Сообщение не найдено", "error");
+            return;
+        }
+        
+        const messageData = messageDoc.data();
+        
+        if (messageData.senderId !== currentUser.uid) {
+            showTempMessage("Нельзя удалить чужое сообщение", "error");
+            return;
+        }
+        
+        // 🔥 МГНОВЕННО СКРЫВАЕМ сообщение из интерфейса
+        const messageElement = document.querySelector(`.message-item[data-message-id="${messageId}"]`);
+        if (messageElement) {
+            messageElement.classList.add('hiding');
+            setTimeout(() => {
+                if (messageElement.parentNode) {
+                    messageElement.parentNode.removeChild(messageElement);
+                }
+            }, 300);
+        }
+        
+        // 🔥 ПОЛНОСТЬЮ УДАЛЯЕМ из базы данных
+        await db.collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .doc(messageId)
+            .delete();
+        
+        console.log("✅ Сообщение полностью удалено из базы данных");
+        
+        // 🔥 Отменяем email уведомление если есть
+        if (currentEmailMessageId === messageId && currentEmailChatId === chatId) {
+            hideEmailNotification();
+            showTempMessage("Сообщение удалено - email отменен", "success");
+        } else {
+            showTempMessage("Сообщение удалено навсегда");
+        }
+        
+        // 🔥 ОБНОВЛЯЕМ последнее сообщение в чате
+        await updateLastMessageInChat(chatId);
+        
+    } catch (error) {
+        console.error('❌ Ошибка удаления сообщения:', error);
+        showTempMessage("Ошибка при удалении", "error");
+    }
+}
+
+// Функция для показа временных сообщений
+function showTempMessage(text, type = "success") {
+    // Создаем элемент сообщения
+    const tempMsg = document.createElement('div');
+    tempMsg.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === "success" ? "#28a745" : type === "error" ? "#dc3545" : "#17a2b8"};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 10000;
+        font-size: 14px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-width: 300px;
+        word-wrap: break-word;
+    `;
+    tempMsg.textContent = text;
+    document.body.appendChild(tempMsg);
+    
+    // Автоматическое удаление через 3 секунды
+    setTimeout(() => {
+        if (document.body.contains(tempMsg)) {
+            document.body.removeChild(tempMsg);
+        }
+    }, 3000);
+}
+
+// Показать контекстное меню
+function showContextMenu(messageItem, x, y) {
+     const contextMenu = document.getElementById('message-context-menu');
+    const messageId = messageItem.dataset.messageId;
+    const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
+    const messageText = messageItem.querySelector('.message-text').textContent;
+    
+    // Сохраняем данные в меню
+    contextMenu.dataset.messageId = messageId;
+    contextMenu.dataset.chatId = chatId;
+    contextMenu.dataset.messageText = messageText;
+    
+    // Позиционируем меню
+    const menuWidth = 200;
+    const menuHeight = 120; // Увеличили высоту для третьей кнопки
+    
+    // Проверяем чтобы меню не выходило за границы экрана
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    let posX = x;
+    let posY = y;
+    
+    if (x + menuWidth > viewportWidth) {
+        posX = viewportWidth - menuWidth - 10;
+    }
+    
+    if (y + menuHeight > viewportHeight) {
+        posY = viewportHeight - menuHeight - 10;
+    }
+    
+    contextMenu.style.left = posX + 'px';
+    contextMenu.style.top = posY + 'px';
+    contextMenu.style.display = 'block';
+    
+    // Добавляем анимацию появления
+    contextMenu.style.opacity = '0';
+    contextMenu.style.transform = 'scale(0.8)';
+    
+    setTimeout(() => {
+        contextMenu.style.transition = 'all 0.2s ease';
+        contextMenu.style.opacity = '1';
+        contextMenu.style.transform = 'scale(1)';
+    }, 10);
+    
+    // Подсвечиваем ТОЛЬКО выбранное сообщение
+    messageItem.style.background = 'rgba(255, 235, 59, 0.2)';
+    messageItem.style.border = '2px solid #ffd54f';
+    
+    // Убедимся что другие сообщения не подсвечены
+    document.querySelectorAll('.message-item.own').forEach(item => {
+        if (item !== messageItem) {
+            item.style.background = '';
+            item.style.border = '';
+        }
+    });
+}
+
+// Скрыть контекстное меню
+function hideContextMenu() {
+      const contextMenu = document.getElementById('message-context-menu');
+    contextMenu.style.display = 'none';
+    
+    // 🔥 ВОССТАНАВЛИВАЕМ исходный цвет сообщения
+    document.querySelectorAll('.message-item.own').forEach(item => {
+        item.style.background = ''; // Возвращаем исходный фон
+        item.style.border = '';     // Убираем границу
+        item.style.transform = '';  // Возвращаем исходный размер
+    });
+}
+
+// Обработчик кликов в контекстном меню
+function initContextMenuHandlers() {
+    const contextMenu = document.getElementById('message-context-menu');
+    
+    contextMenu.addEventListener('click', (e) => {
+        if (e.target.classList.contains('context-menu-item')) {
+            const action = e.target.dataset.action;
+            const messageId = contextMenu.dataset.messageId;
+            const chatId = contextMenu.dataset.chatId;
+            const messageText = contextMenu.dataset.messageText;
+            
+            if (action === 'edit') {
+                editMessage(messageId, chatId, messageText);
+            } else if (action === 'copy') {
+                copyMessageText(messageText);
+            } else if (action === 'delete') {
+                deleteMessage(messageId, chatId);
+            }
+            
+            hideContextMenu();
+        }
+    });
+}
+
+// Функция редактирования сообщения
+function editMessage(messageId, chatId, currentText) {
+       const messageElement = document.querySelector(`.message-item[data-message-id="${messageId}"]`);
+    if (!messageElement) return;
+    
+    // 🔥 УСТАНАВЛИВАЕМ ФЛАГ РЕДАКТИРОВАНИЯ
+    isEditingMessage = true;
+    console.log("изменение "+isEditingMessage);
+    
+    // 🔥 ПРИОСТАНАВЛИВАЕМ таймер email если редактируемое сообщение - это то, для которого запланирован email
+    if (currentEmailMessageId === messageId && currentEmailChatId === chatId) {
+        pauseEmailTimer();
+    }
+    
+    // Скрываем оригинальный текст
+    const messageTextElement = messageElement.querySelector('.message-text');
+    messageTextElement.style.display = 'none';
+    
+    // Создаем контейнер для редактирования
+    let editContainer = messageElement.querySelector('.message-edit-container');
+    
+    if (!editContainer) {
+        editContainer = document.createElement('div');
+        editContainer.className = 'message-edit-container';
+        messageElement.appendChild(editContainer);
+    }
+    
+    editContainer.innerHTML = `
+        <input type="text" class="edit-input" value="${currentText}" maxlength="1000">
+        <div class="edit-actions">
+            <button class="edit-btn edit-cancel">Отмена</button>
+            <button class="edit-btn edit-save">Сохранить</button>
+        </div>
+    `;
+    
+    editContainer.classList.add('active');
+    messageElement.classList.add('editing');
+    
+    // Фокус на поле ввода
+    const editInput = editContainer.querySelector('.edit-input');
+    editInput.focus();
+    editInput.select();
+    
+    // Обработчики кнопок
+    const cancelBtn = editContainer.querySelector('.edit-cancel');
+    const saveBtn = editContainer.querySelector('.edit-save');
+    
+    cancelBtn.addEventListener('click', () => {
+        cancelEdit(messageElement, messageTextElement, messageId, chatId);
+    });
+    
+    saveBtn.addEventListener('click', () => {
+        saveMessageEdit(messageId, chatId, editInput.value, messageElement, messageTextElement);
+    });
+    
+    // Сохранение по Enter, отмена по Escape
+    editInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            saveMessageEdit(messageId, chatId, editInput.value, messageElement, messageTextElement);
+        } else if (e.key === 'Escape') {
+            cancelEdit(messageElement, messageTextElement, messageId, chatId);
+        }
+    });
+    
+    // Закрытие по клику вне области редактирования
+    const closeEditHandler = (e) => {
+        if (!editContainer.contains(e.target)) {
+            cancelEdit(messageElement, messageTextElement, messageId, chatId);
+            document.removeEventListener('click', closeEditHandler);
+        }
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeEditHandler);
+    }, 100);
+}
+
+// Отмена редактирования
+function cancelEdit(messageElement, messageTextElement, messageId, chatId) {
+    const editContainer = messageElement.querySelector('.message-edit-container');
+    if (editContainer) {
+        editContainer.classList.remove('active');
+        editContainer.innerHTML = '';
+    }
+    messageTextElement.style.display = 'block';
+    messageElement.classList.remove('editing');
+    
+    // 🔥 СБРАСЫВАЕМ ФЛАГ РЕДАКТИРОВАНИЯ
+    isEditingMessage = false;
+    
+    // 🔥 УБИРАЕМ ОВЕРЛЕЙ (если используете его)
+    const overlay = document.getElementById('edit-overlay');
+    if (overlay) {
+        overlay.classList.remove('active');
+    }
+    
+    // 🔥 ВОЗОБНОВЛЯЕМ таймер email если отменили редактирование
+    if (currentEmailMessageId === messageId && currentEmailChatId === chatId) {
+        resumeEmailTimer();
+    }
+}
+
+// Сохранение измененного сообщения
+async function saveMessageEdit(messageId, chatId, newText, messageElement, messageTextElement) {
+    if (!newText.trim()) {
+        showTempMessage("Сообщение не может быть пустым", "error");
+        if (currentEmailMessageId === messageId && currentEmailChatId === chatId) {
+            resumeEmailTimer();
+        }
+        // 🔥 СБРАСЫВАЕМ ФЛАГ РЕДАКТИРОВАНИЯ ПРИ ОШИБКЕ
+        isEditingMessage = false;
+        return;
+    }
+    
+    try {
+        // Обновляем сообщение в базе данных
+        await db.collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .doc(messageId)
+            .update({
+                text: newText,
+                edited: true,
+                editedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        
+        // Обновляем текст в интерфейсе
+        messageTextElement.textContent = newText;
+        
+        // Добавляем пометку "изменено"
+        addEditedBadge(messageElement);
+        
+        // Скрываем редактор
+        const editContainer = messageElement.querySelector('.message-edit-container');
+        if (editContainer) {
+            editContainer.classList.remove('active');
+            editContainer.innerHTML = '';
+        }
+        messageTextElement.style.display = 'block';
+        messageElement.classList.remove('editing');
+        
+        // 🔥 ВОЗОБНОВЛЯЕМ таймер email после успешного сохранения
+        if (currentEmailMessageId === messageId && currentEmailChatId === chatId) {
+            resumeEmailTimer();
+        }
+        
+        // Обновляем последнее сообщение в чате если это было последнее сообщение
+        await updateLastMessageIfNeeded(chatId, newText);
+        
+        showTempMessage("Сообщение изменено", "success");
+        
+     // 🔥 СБРАСЫВАЕМ ФЛАГ РЕДАКТИРОВАНИЯ ПОСЛЕ УСПЕШНОГО СОХРАНЕНИЯ
+        isEditingMessage = true;
+        
+    } catch (error) {
+        console.error('❌ Ошибка редактирования сообщения:', error);
+        showTempMessage("Ошибка при изменении сообщения", "error");
+        
+        // 🔥 СБРАСЫВАЕМ ФЛАГ РЕДАКТИРОВАНИЯ ПРИ ОШИБКЕ
+        isEditingMessage = false;
+        
+        if (currentEmailMessageId === messageId && currentEmailChatId === chatId) {
+            resumeEmailTimer();
+        }
+    }
+}
+
+// Добавление пометки "изменено"
+function addEditedBadge(messageElement) {
+    let editedBadge = messageElement.querySelector('.edited-badge');
+    if (!editedBadge) {
+        editedBadge = document.createElement('span');
+        editedBadge.className = 'edited-badge';
+        editedBadge.textContent = ' (изменено)';
+        editedBadge.style.fontSize = '10px';
+        editedBadge.style.opacity = '0.7';
+        editedBadge.style.fontStyle = 'italic';
+        
+        const messageMeta = messageElement.querySelector('.message-meta');
+        if (messageMeta) {
+            messageMeta.appendChild(editedBadge);
+        }
+    }
+}
+
+// Обновление последнего сообщения в чате если нужно
+async function updateLastMessageIfNeeded(chatId, newText) {
+    try {
+        const chatDoc = await db.collection('chats').doc(chatId).get();
+        const chatData = chatDoc.data();
+        
+        if (chatData.lastMessage) {
+            // Получаем последнее сообщение чтобы проверить
+            const lastMessageSnapshot = await db.collection('chats')
+                .doc(chatId)
+                .collection('messages')
+                .orderBy('timestamp', 'desc')
+                .limit(1)
+                .get();
+            
+            if (!lastMessageSnapshot.empty) {
+                const lastMessage = lastMessageSnapshot.docs[0].data();
+                if (lastMessage.text === newText) {
+                    // Если измененное сообщение было последним - обновляем чат
+                    await db.collection('chats').doc(chatId).update({
+                        lastMessage: newText
+                    });
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка обновления последнего сообщения:', error);
+    }
+}
+
+// Функция копирования текста
+function copyMessageText(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showTempMessage("Текст скопирован 📋");
+    }).catch(err => {
+        console.error('Ошибка копирования:', err);
+        // Fallback для старых браузеров
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        showTempMessage("Текст скопирован 📋");
+    });
+}
+
+// Очистка таймера удержания
+function clearLongPress() {
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+    longPressTarget = null;
+}
+
+
 
 // Отправка уведомления на email
 function sendEmailNotification(recipient, messageText) {
@@ -874,6 +1401,12 @@ function addClearSearchButton() {
     searchContainer.appendChild(clearBtn);
 }
 
+
+function initContextMenu() {
+    initContextMenuHandlers();
+    initLongPressSimple(); // Ваша существующая функция
+}
+
 // Отслеживание состояния аутентификации
 auth.onAuthStateChanged((user) => {
     if (user) {
@@ -888,6 +1421,20 @@ auth.onAuthStateChanged((user) => {
                         ...userData
                     };
                     
+ initContextMenu(); // Инициализируем контекстное меню
+
+// Инициализируем мобильное меню
+        initMobileMenu();
+        handleResize();
+        
+        // Слушаем изменения размера окна
+        window.addEventListener('resize', handleResize);
+
+ // Инициализируем удержание (простая версия)
+        setTimeout(() => {
+            initLongPressSimple(); // ← Используйте эту функцию
+        }, 1000);
+
                     userNameSpan.textContent = userData.name;
                     
                     // Переключение на основной интерфейс
@@ -1181,35 +1728,307 @@ document.getElementById('change-name-form').addEventListener('submit', async (e)
 
 // Обновление имени пользователя в чатах
 async function updateUserNameInChats(newName) {
-    try {
-        // Получаем все чаты пользователя
-        const chatsSnapshot = await db.collection('chats')
-            .where('participants', 'array-contains', currentUser.uid)
+     try {
+        // Получаем последнее НЕ удаленное сообщение
+        const messagesSnapshot = await db.collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .orderBy('timestamp', 'desc')
+            .limit(1)
             .get();
         
-        const batch = db.batch();
+        if (messagesSnapshot.empty) {
+            // Если сообщений нет - очищаем lastMessage
+            await db.collection('chats').doc(chatId).update({
+                lastMessage: null,
+                lastMessageTime: null
+            });
+            return;
+        }
         
-        for (const chatDoc of chatsSnapshot.docs) {
-            // Обновляем имя в сообщениях
-            const messagesSnapshot = await db.collection('chats')
-                .doc(chatDoc.id)
-                .collection('messages')
-                .where('senderId', '==', currentUser.uid)
-                .get();
+        const lastMessageDoc = messagesSnapshot.docs[0];
+        const lastMessage = lastMessageDoc.data();
+        
+        // Обновляем lastMessage в чате
+        await db.collection('chats').doc(chatId).update({
+            lastMessage: lastMessage.text,
+            lastMessageTime: lastMessage.timestamp
+        });
+        
+    } catch (error) {
+        console.error('Ошибка обновления последнего сообщения:', error);
+    }
+}
+
+async function updateLastMessageInChat(chatId) {
+    try {
+        // Получаем последнее сообщение (теперь удаленных уже нет в базе)
+        const messagesSnapshot = await db.collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .orderBy('timestamp', 'desc')
+            .limit(1)
+            .get();
+        
+        if (messagesSnapshot.empty) {
+            // Если сообщений нет - очищаем lastMessage
+            await db.collection('chats').doc(chatId).update({
+                lastMessage: null,
+                lastMessageTime: null
+            });
+            return;
+        }
+        
+        const lastMessageDoc = messagesSnapshot.docs[0];
+        const lastMessage = lastMessageDoc.data();
+        
+        // Обновляем lastMessage в чате
+        await db.collection('chats').doc(chatId).update({
+            lastMessage: lastMessage.text,
+            lastMessageTime: lastMessage.timestamp
+        });
+        
+        console.log("✅ Last message updated in chat");
+        
+    } catch (error) {
+        console.error('Ошибка обновления последнего сообщения:', error);
+    }
+}
+
+let emailNotificationTimer = null;
+let currentEmailMessageId = null;
+let currentEmailChatId = null;
+
+// Показать уведомление
+function showEmailNotification(messageId, chatId) {
+     const notification = document.getElementById('email-notification');
+    const timerElement = document.getElementById('email-timer');
+    
+    currentEmailMessageId = messageId;
+    currentEmailChatId = chatId;
+    emailTimerPaused = false;
+    
+    // Сбрасываем предыдущий таймер
+    if (emailNotificationTimer) {
+        clearInterval(emailNotificationTimer);
+    }
+    
+    // Показываем уведомление
+    notification.style.display = 'block';
+    
+    let timeLeft = 40; // 40 секунд
+    timerElement.textContent = timeLeft;
+    
+    emailNotificationTimer = setInterval(() => {
+        if (!emailTimerPaused) {
+            timeLeft--;
+            timerElement.textContent = timeLeft;
             
-            for (const messageDoc of messagesSnapshot.docs) {
-                const messageRef = db.collection('chats')
-                    .doc(chatDoc.id)
-                    .collection('messages')
-                    .doc(messageDoc.id);
-                batch.update(messageRef, { senderName: newName });
+            if (timeLeft <= 0) {
+                hideEmailNotification();
+                sendEmailNow(messageId, chatId);
+            }
+        }
+    }, 1000);
+}
+
+// Приостановить таймер email
+function pauseEmailTimer() {
+   if (emailNotificationTimer && !emailTimerPaused) {
+        emailTimerPaused = true;
+        emailTimerPauseTime = Date.now();
+        
+        const timerElement = document.getElementById('email-timer');
+        if (timerElement) {
+            emailTimerRemaining = parseInt(timerElement.textContent);
+        }
+        
+        // Визуальный индикатор паузы
+        const notification = document.getElementById('email-notification');
+        if (notification) {
+            notification.classList.add('paused');
+            
+            const subtitle = notification.querySelector('.notification-subtitle');
+            if (subtitle) {
+                subtitle.innerHTML = 'Редактирование сообщения...<div class="pause-indicator">Таймер на паузе</div>';
             }
         }
         
-        await batch.commit();
-        console.log('Имя обновлено во всех чатах');
+        console.log("⏸️ Таймер email приостановлен");
+    }
+}
+
+// Возобновить таймер email
+function resumeEmailTimer() {
+     if (emailNotificationTimer && emailTimerPaused && emailTimerRemaining) {
+        emailTimerPaused = false;
+        emailTimerPauseTime = null;
+        
+        // Убираем визуальный индикатор паузы
+        const notification = document.getElementById('email-notification');
+        if (notification) {
+            notification.classList.remove('paused');
+            
+            const subtitle = notification.querySelector('.notification-subtitle');
+            if (subtitle) {
+                subtitle.innerHTML = 'Вы можете удалить сообщение в течение 40 секунд чтобы отменить отправку (или изменить(таймер будет на паузе)). Не закрывайте сайт до конца таймера';
+            }
+        }
+        
+        console.log("▶️ Таймер email возобновлен");
+        
+        const timerElement = document.getElementById('email-timer');
+        if (timerElement) {
+            timerElement.textContent = emailTimerRemaining;
+        }
+        
+        emailTimerRemaining = null;
+    }
+}
+
+// Полностью отменить таймер email
+function cancelEmailTimer() {
+    if (emailNotificationTimer) {
+        clearInterval(emailNotificationTimer);
+        emailNotificationTimer = null;
+    }
+    
+    emailTimerPaused = false;
+    emailTimerPauseTime = null;
+    emailTimerRemaining = null;
+    currentEmailMessageId = null;
+    currentEmailChatId = null;
+    
+    hideEmailNotification();
+    console.log("⏹️ Таймер email отменен");
+}
+
+// Скрыть уведомление
+function hideEmailNotification() {
+    const notification = document.getElementById('email-notification');
+    
+    if (emailNotificationTimer) {
+        clearInterval(emailNotificationTimer);
+        emailNotificationTimer = null;
+    }
+    
+    notification.classList.add('hiding');
+    setTimeout(() => {
+        notification.style.display = 'none';
+        notification.classList.remove('hiding');
+        currentEmailMessageId = null;
+        currentEmailChatId = null;
+    }, 300);
+}
+
+// Немедленная отправка email
+async function sendEmailNow(messageId, chatId) {
+     try {
+        // 🔥 ПРОВЕРЯЕМ что сообщение еще существует
+        const messageDoc = await db.collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .doc(messageId)
+            .get();
+            
+        if (!messageDoc.exists) {
+            console.log("❌ Сообщение было удалено, email отменен");
+            return;
+        }
+        
+        const message = messageDoc.data();
+        
+        // Получаем данные получателя
+        const recipientId = chatId.split('_').find(id => id !== currentUser.uid);
+        const recipientDoc = await db.collection('users').doc(recipientId).get();
+        
+        if (!recipientDoc.exists) {
+            console.log("❌ Получатель не найден");
+            return;
+        }
+        
+        const recipientData = recipientDoc.data();
+        
+        /*
+        if (!recipientData.emailNotifications) {
+            console.log("❌ Email отменен - уведомления отключены");
+            return;
+        }*/
+        
+        // Отправляем email
+        await sendEmailNotification(recipientData, message.text);
+        
+        console.log("✅ Email отправлен");
+        showTempMessage("Email уведомление отправлено", "success");
         
     } catch (error) {
-        console.error('Ошибка обновления имени в чатах:', error);
+        console.error("❌ Ошибка отправки email:", error);
+        showTempMessage("Ошибка отправки email", "error");
+    }
+}
+
+function initMobileMenu() {
+    const menuToggle = document.querySelector('.menu-toggle');
+    const usersPanel = document.querySelector('.users-panel');
+    const chatArea = document.querySelector('.chat-area');
+    
+    if (menuToggle && usersPanel) {
+        menuToggle.addEventListener('click', () => {
+            usersPanel.classList.toggle('active');
+            menuToggle.classList.toggle('active');
+            
+            // На мобильных скрываем чат когда открыто меню
+            if (window.innerWidth <= 768) {
+                if (usersPanel.classList.contains('active')) {
+                    chatArea.style.display = 'none';
+                    menuToggle.innerHTML = '✕'; // Иконка закрытия
+                } else {
+                    chatArea.style.display = 'flex';
+                    menuToggle.innerHTML = '☰'; // Иконка меню
+                }
+            }
+        });
+        
+        // Закрываем меню при выборе пользователя на мобильных
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768 && 
+                usersPanel.classList.contains('active') &&
+                e.target.closest('.user-item')) {
+                usersPanel.classList.remove('active');
+                menuToggle.classList.remove('active');
+                chatArea.style.display = 'flex';
+                menuToggle.innerHTML = '☰';
+            }
+        });
+    }
+}
+
+// Обновите обработчик изменения размера окна
+function handleResize() {
+    const menuToggle = document.querySelector('.menu-toggle');
+    const usersPanel = document.querySelector('.users-panel');
+    const chatArea = document.querySelector('.chat-area');
+    
+    if (window.innerWidth > 768) {
+        // На десктопе всегда показываем обе панели
+        if (usersPanel) {
+            usersPanel.classList.add('active');
+            usersPanel.style.display = 'block';
+        }
+        if (chatArea) {
+            chatArea.style.display = 'flex';
+        }
+        if (menuToggle) {
+            menuToggle.style.display = 'none';
+        }
+    } else {
+        // На мобильных скрываем панель пользователей по умолчанию
+        if (menuToggle) {
+            menuToggle.style.display = 'block';
+            menuToggle.innerHTML = '☰';
+        }
+        if (usersPanel) {
+            usersPanel.classList.remove('active');
+        }
     }
 }
