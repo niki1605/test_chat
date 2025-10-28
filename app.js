@@ -704,68 +704,151 @@ function sendMessage() {
 function initLongPressSimple() {
     const contextMenu = document.getElementById('message-context-menu');
     let pressTimer;
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('mousedown', handleDocumentClick);
-    document.addEventListener('keydown', handleKeyDown);
+    let longPressTarget = null;
 
-    // 🔥 СОЗДАЕМ ОТДЕЛЬНЫЕ ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ ОБРАБОТЧИКАМИ
-    function handleMouseDown(e) {
-        // 🔥 ЕСЛИ ИДЕТ РЕДАКТИРОВАНИЕ - НИЧЕГО НЕ ДЕЛАЕМ
-        if (isEditingMessage) {
-            return;
-        }
+    // 🔥 ОСНОВНАЯ ФУНКЦИЯ LONG PRESS
+    function startLongPress(e, target) {
+        if (isEditingMessage) return;
 
-        const messageItem = e.target.closest('.message-item.own');
+        const messageItem = target.closest('.message-item.own');
         
         if (messageItem && !messageItem.classList.contains('deleted')) {
+            // 🔥 СОХРАНЯЕМ ЦЕЛЕВОЙ ЭЛЕМЕНТ
+            longPressTarget = messageItem;
+            
             pressTimer = setTimeout(() => {
-                const messageId = messageItem.dataset.messageId;
-                const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
-                const messageText = messageItem.querySelector('.message-text').textContent;
-                
-                contextMenu.dataset.messageId = messageId;
-                contextMenu.dataset.chatId = chatId;
-                contextMenu.dataset.messageText = messageText;
-                
-                contextMenu.style.left = e.clientX + 'px';
-                contextMenu.style.top = e.clientY + 'px';
-                contextMenu.style.display = 'block';
-                
-                messageItem.style.background = 'rgba(255, 235, 59, 0.2)';
-                
-            }, 800);
+                showContextMenuForMessage(messageItem, e);
+            }, 600); // 600ms - оптимальное время для мобильных
         }
     }
 
-    function handleMouseUp() {
-        if (!isEditingMessage) {
-            clearTimeout(pressTimer);
+    function endLongPress() {
+        clearTimeout(pressTimer);
+    }
+
+    // 🔥 ПОКАЗ КОНТЕКСТНОГО МЕНЮ
+    function showContextMenuForMessage(messageItem, e) {
+        const messageId = messageItem.dataset.messageId;
+        const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
+        const messageText = messageItem.querySelector('.message-text').textContent;
+        
+        contextMenu.dataset.messageId = messageId;
+        contextMenu.dataset.chatId = chatId;
+        contextMenu.dataset.messageText = messageText;
+        
+        // 🔥 ПОЗИЦИОНИРОВАНИЕ ДЛЯ МОБИЛЬНЫХ
+        let clientX, clientY;
+        
+        if (e.touches && e.touches[0]) {
+            // Touch events
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            // Mouse events (fallback)
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        
+        // Центрируем меню на мобильных
+        const menuWidth = 200;
+        const menuHeight = 120;
+        
+        contextMenu.style.left = '50%';
+        contextMenu.style.top = '50%';
+        contextMenu.style.transform = 'translate(-50%, -50%)';
+        contextMenu.style.display = 'block';
+        
+        // Подсвечиваем сообщение
+        messageItem.style.background = 'rgba(255, 235, 59, 0.2)';
+        
+        console.log("📱 Контекстное меню открыто");
+    }
+
+    // 🔥 ФУНКЦИЯ СКРЫТИЯ МЕНЮ
+    function hideContextMenu() {
+        contextMenu.style.display = 'none';
+        
+        if (longPressTarget) {
+            longPressTarget.style.background = '';
+            longPressTarget = null;
         }
     }
 
-    function handleDocumentClick(e) {
-        // 🔥 ЕСЛИ ИДЕТ РЕДАКТИРОВАНИЕ - НЕ ЗАКРЫВАЕМ
-        if (isEditingMessage) {
-            return;
-        }
+    // 🔥 ОБРАБОТЧИКИ TOUCH СОБЫТИЙ (ДЛЯ РЕАЛЬНЫХ МОБИЛЬНЫХ)
+    document.addEventListener('touchstart', function(e) {
+        startLongPress(e, e.target);
+    }, { passive: true }); // 🔥 ВАЖНО: passive: true для производительности
 
-        if (!contextMenu.contains(e.target) && 
-            !e.target.closest('.message-item.own') && 
-            contextMenu.style.display === 'block') {
+    document.addEventListener('touchend', function() {
+        endLongPress();
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function() {
+        endLongPress(); // Отменяем long press при движении пальца
+    }, { passive: true });
+
+    // 🔥 ОБРАБОТЧИКИ МЫШИ (ДЛЯ ПК)
+    document.addEventListener('mousedown', function(e) {
+        startLongPress(e, e.target);
+    });
+
+    document.addEventListener('mouseup', function() {
+        endLongPress();
+    });
+
+    // 🔥 ЗАКРЫТИЕ МЕНЮ ПРИ КЛИКЕ ВНЕ ЕГО
+    document.addEventListener('click', function(e) {
+        if (isEditingMessage) return;
+        
+        if (contextMenu.style.display === 'block' && 
+            !contextMenu.contains(e.target) && 
+            !e.target.closest('.message-item.own')) {
             hideContextMenu();
         }
-    }
+    });
 
-    function handleKeyDown(e) {
-        // 🔥 ЕСЛИ ИДЕТ РЕДАКТИРОВАНИЕ - НЕ ЗАКРЫВАЕМ
-        if (isEditingMessage) {
-            return;
-        }
-
-        if (e.key === 'Escape' && contextMenu.style.display === 'block') {
+    // 🔥 ОБРАБОТЧИК ДЛЯ КОНТЕКСТНОГО МЕНЮ
+    contextMenu.addEventListener('click', function(e) {
+        if (e.target.classList.contains('context-menu-item')) {
+            const action = e.target.dataset.action;
+            const messageId = this.dataset.messageId;
+            const chatId = this.dataset.chatId;
+            const messageText = this.dataset.messageText;
+            
+            if (action === 'edit') {
+                editMessage(messageId, chatId, messageText);
+            } else if (action === 'copy') {
+                copyMessageText(messageText);
+            } else if (action === 'delete') {
+                deleteMessage(messageId, chatId);
+            }
+            
             hideContextMenu();
         }
+    });
+
+    console.log("✅ Long press инициализирован для мобильных устройств");
+}
+
+// 🔥 ОБРАБОТЧИК КЛИКОВ В КОНТЕКСТНОМ МЕНЮ
+function handleContextMenuClick(e) {
+    if (e.target.classList.contains('context-menu-item')) {
+        const action = e.target.dataset.action;
+        const messageId = this.dataset.messageId;
+        const chatId = this.dataset.chatId;
+        const messageText = this.dataset.messageText;
+        
+        console.log(`🔘 Действие: ${action} для сообщения ${messageId}`);
+        
+        if (action === 'edit') {
+            editMessage(messageId, chatId, messageText);
+        } else if (action === 'copy') {
+            copyMessageText(messageText);
+        } else if (action === 'delete') {
+            deleteMessage(messageId, chatId);
+        }
+        
+        hideContextMenu();
     }
 }
 
