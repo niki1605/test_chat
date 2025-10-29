@@ -1631,3 +1631,24 @@ button:disabled {
         min-width: 60px !important;
     }
 }
+.search-container,
+#user-search,
+#search-btn,
+#clear-search,
+#search-results,
+.search-result-item {
+    pointer-events: auto !important;
+}
+
+/* 🔥 ПРЕДОТВРАЩАЕМ ВСПЛЫТИЕ СОБЫТИЙ */
+#user-search:focus,
+#search-btn:active,
+#clear-search:active {
+    outline: none !important;
+}
+
+/* 🔥 ГАРАНТИРУЕМ ЧТО ПОИСК РАБОТАЕТ В ОТКРЫТОЙ ПАНЕЛИ */
+.users-panel.active .search-container {
+    z-index: 1005 !important;
+    position: relative !important;
+}
