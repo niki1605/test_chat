@@ -1417,28 +1417,21 @@ button:disabled {
 
 
  .messages-container {
-     flex: 1;
+    flex: 1;
     overflow-y: auto;
     padding: 20px;
     background-color: #f8f9fa;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    /* Отступ снизу для безопасной зоны */
-    padding-bottom: env(safe-area-inset-bottom, 20px);
 }
 
 .message-input-container {
-     padding: 15px 20px;
+    padding: 15px 20px;
     background-color: white;
     border-top: 1px solid #e0e0e0;
     display: flex;
     gap: 10px;
-    position: sticky;
-    bottom: 0;
-    /* Защита от адресной строки */
-    padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px));
-    margin-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 #message-input {
@@ -1486,6 +1479,8 @@ button:disabled {
     display: flex;
     flex-direction: column;
     background-color: #fff;
+     padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .chat-header {
