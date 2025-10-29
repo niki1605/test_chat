@@ -848,261 +848,134 @@ function deleteMessage(messageId, chatId) {
 
 
 function initLongPressSimple() {
-           console.log("🔄 Инициализация long press для мобильных устройств...");
-    
     const contextMenu = document.getElementById('message-context-menu');
-    if (!contextMenu) {
-        console.error('❌ Контекстное меню не найдено');
-        return;
+    let pressTimer;
+    let longPressTarget = null;
+
+    // 🔥 ОСНОВНАЯ ФУНКЦИЯ LONG PRESS
+    function startLongPress(e, target) {
+        if (isEditingMessage) return;
+
+        const messageItem = target.closest('.message-item.own');
+        
+        if (messageItem && !messageItem.classList.contains('deleted')) {
+            // 🔥 СОХРАНЯЕМ ЦЕЛЕВОЙ ЭЛЕМЕНТ
+            longPressTarget = messageItem;
+            
+            pressTimer = setTimeout(() => {
+                showContextMenuForMessage(messageItem, e);
+            }, 600); // 600ms - оптимальное время для мобильных
+        }
     }
 
-    let pressTimer = null;
-    let currentMessageElement = null;
-    let isContextMenuVisible = false;
+    function endLongPress() {
+        clearTimeout(pressTimer);
+    }
 
-    // 🔥 УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ДЛЯ ПОКАЗА МЕНЮ
-    function showContextMenuUniversal(messageElement, e) {
-        if (!selectedChatUser || !selectedChatUser.id) {
-            showTempMessage("Сначала выберите собеседника", "info");
-            return;
-        }
-
-        const messageId = messageElement.dataset.messageId;
-        const messageText = messageElement.querySelector('.message-text')?.textContent || '';
+    // 🔥 ПОКАЗ КОНТЕКСТНОГО МЕНЮ
+    function showContextMenuForMessage(messageItem, e) {
+        const messageId = messageItem.dataset.messageId;
+        const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
+        const messageText = messageItem.querySelector('.message-text').textContent;
         
-        if (!messageId) {
-            console.error('❌ messageId не найден');
-            return;
-        }
-
-        // Получаем координаты
+        contextMenu.dataset.messageId = messageId;
+        contextMenu.dataset.chatId = chatId;
+        contextMenu.dataset.messageText = messageText;
+        
+        // 🔥 ПОЗИЦИОНИРОВАНИЕ ДЛЯ МОБИЛЬНЫХ
         let clientX, clientY;
+        
         if (e.touches && e.touches[0]) {
-            // Touch event
+            // Touch events
             clientX = e.touches[0].clientX;
             clientY = e.touches[0].clientY;
         } else {
-            // Mouse event
+            // Mouse events (fallback)
             clientX = e.clientX;
             clientY = e.clientY;
         }
-
-        // 🔥 ВЫЗЫВАЕМ СУЩЕСТВУЮЩУЮ ФУНКЦИЮ
-        if (typeof showContextMenu === 'function') {
-            showContextMenu(messageElement, clientX, clientY);
-        } else {
-            // Fallback
-            showSimpleContextMenu(messageElement, clientX, clientY);
-        }
         
-        isContextMenuVisible = true;
-        console.log("✅ Контекстное меню открыто");
-    }
-
-    // 🔥 FALLBACK ФУНКЦИЯ
-    function showSimpleContextMenu(messageElement, x, y) {
-        const messageId = messageElement.dataset.messageId;
-        const messageText = messageElement.querySelector('.message-text')?.textContent || '';
-        
-        contextMenu.dataset.messageId = messageId;
-        contextMenu.dataset.messageText = messageText;
-        
-        // Позиционируем с учетом границ экрана
+        // Центрируем меню на мобильных
         const menuWidth = 200;
         const menuHeight = 120;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        let posX = x;
-        let posY = y;
-
-        if (posX + menuWidth > viewportWidth) {
-            posX = viewportWidth - menuWidth - 10;
-        }
-        if (posY + menuHeight > viewportHeight) {
-            posY = viewportHeight - menuHeight - 10;
-        }
-
-        contextMenu.style.left = posX + 'px';
-        contextMenu.style.top = posY + 'px';
+        
+        contextMenu.style.left = '50%';
+        contextMenu.style.top = '50%';
+        contextMenu.style.transform = 'translate(-50%, -50%)';
         contextMenu.style.display = 'block';
         
-        messageElement.style.backgroundColor = 'rgba(255, 235, 59, 0.3)';
-        currentMessageElement = messageElement;
+        // Подсвечиваем сообщение
+        messageItem.style.background = 'rgba(255, 235, 59, 0.2)';
+        
+        console.log("📱 Контекстное меню открыто");
     }
 
     // 🔥 ФУНКЦИЯ СКРЫТИЯ МЕНЮ
-    function hideContextMenuUniversal() {
-        if (typeof hideContextMenu === 'function') {
-            hideContextMenu();
-        } else {
-            contextMenu.style.display = 'none';
-            if (currentMessageElement) {
-                currentMessageElement.style.backgroundColor = '';
-                currentMessageElement = null;
-            }
-        }
-        isContextMenuVisible = false;
-    }
-
-    // 🔥 ОБРАБОТЧИК ДЛЯ TOUCH УСТРОЙСТВ
-    function handleTouchStart(e) {
-        const messageElement = e.target.closest('.message-item.own');
-        if (!messageElement || messageElement.classList.contains('deleted')) return;
-
-        // 🔥 ВАЖНО: предотвращаем стандартное поведение
-        e.preventDefault();
-        e.stopPropagation();
-
-        currentMessageElement = messageElement;
-
-        pressTimer = setTimeout(() => {
-            showContextMenuUniversal(messageElement, e);
-            
-            // 🔥 ВИБРАЦИЯ НА МОБИЛЬНЫХ
-            if (navigator.vibrate) {
-                navigator.vibrate(50);
-            }
-        }, 500);
-    }
-
-    function handleTouchEnd(e) {
-        if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-        }
+    function hideContextMenu() {
+        contextMenu.style.display = 'none';
         
-        // 🔥 ЕСЛИ МЕНЮ ОТКРЫТО, ПРЕДОТВРАЩАЕМ КЛИК ПОД МЕНЮ
-        if (isContextMenuVisible) {
-            e.preventDefault();
-            e.stopPropagation();
+        if (longPressTarget) {
+            longPressTarget.style.background = '';
+            longPressTarget = null;
         }
     }
 
-    function handleTouchMove(e) {
-        // Отменяем long press при движении пальца
-        if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-        }
-    }
+    // 🔥 ОБРАБОТЧИКИ TOUCH СОБЫТИЙ (ДЛЯ РЕАЛЬНЫХ МОБИЛЬНЫХ)
+    document.addEventListener('touchstart', function(e) {
+        startLongPress(e, e.target);
+    }, { passive: true }); // 🔥 ВАЖНО: passive: true для производительности
 
-    // 🔥 ОБРАБОТЧИКИ ДЛЯ PC
-    function handleMouseDown(e) {
-        if (e.button !== 0) return; // Только левая кнопка мыши
-        
-        const messageElement = e.target.closest('.message-item.own');
-        if (!messageElement || messageElement.classList.contains('deleted')) return;
+    document.addEventListener('touchend', function() {
+        endLongPress();
+    }, { passive: true });
 
-        currentMessageElement = messageElement;
+    document.addEventListener('touchmove', function() {
+        endLongPress(); // Отменяем long press при движении пальца
+    }, { passive: true });
 
-        pressTimer = setTimeout(() => {
-            showContextMenuUniversal(messageElement, e);
-        }, 600);
-    }
+    // 🔥 ОБРАБОТЧИКИ МЫШИ (ДЛЯ ПК)
+    document.addEventListener('mousedown', function(e) {
+        startLongPress(e, e.target);
+    });
 
-    function handleMouseUp() {
-        if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-        }
-    }
-
-    function handleMouseMove() {
-        if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-        }
-    }
-
-    // 🔥 ДОБАВЛЯЕМ ОБРАБОТЧИКИ К СООБЩЕНИЯМ
-    function attachMessageListeners() {
-        // Удаляем старые обработчики
-        document.removeEventListener('touchstart', handleTouchStart);
-        document.removeEventListener('touchend', handleTouchEnd);
-        document.removeEventListener('touchmove', handleTouchMove);
-        document.removeEventListener('mousedown', handleMouseDown);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.removeEventListener('mousemove', handleMouseMove);
-
-        // Добавляем новые обработчики
-        document.addEventListener('touchstart', handleTouchStart, { passive: false });
-        document.addEventListener('touchend', handleTouchEnd, { passive: false });
-        document.addEventListener('touchmove', handleTouchMove, { passive: true });
-        document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
-        
-        document.addEventListener('mousedown', handleMouseDown);
-        document.addEventListener('mouseup', handleMouseUp);
-        document.addEventListener('mousemove', handleMouseMove);
-    }
+    document.addEventListener('mouseup', function() {
+        endLongPress();
+    });
 
     // 🔥 ЗАКРЫТИЕ МЕНЮ ПРИ КЛИКЕ ВНЕ ЕГО
     document.addEventListener('click', function(e) {
-        if (isContextMenuVisible && 
+        if (isEditingMessage) return;
+        
+        if (contextMenu.style.display === 'block' && 
             !contextMenu.contains(e.target) && 
             !e.target.closest('.message-item.own')) {
-            hideContextMenuUniversal();
+            hideContextMenu();
         }
     });
 
-    // 🔥 ЗАКРЫТИЕ ПРИ СКРОЛЛЕ
-    document.addEventListener('scroll', function() {
-        if (isContextMenuVisible) {
-            hideContextMenuUniversal();
-        }
-    });
-
-    // 🔥 ЗАКРЫТИЕ ПРИ ESC
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && isContextMenuVisible) {
-            hideContextMenuUniversal();
-        }
-    });
-
-    // 🔥 ОБРАБОТЧИК ДЕЙСТВИЙ В МЕНЮ
+    // 🔥 ОБРАБОТЧИК ДЛЯ КОНТЕКСТНОГО МЕНЮ
     contextMenu.addEventListener('click', function(e) {
-        const menuItem = e.target.closest('.context-menu-item');
-        if (!menuItem) return;
-
-        const action = menuItem.dataset.action;
-        const messageId = this.dataset.messageId;
-        const messageText = this.dataset.messageText;
-
-        if (!messageId || !selectedChatUser) return;
-
-        const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
-
-        switch (action) {
-            case 'edit':
-                if (typeof editMessage === 'function') {
-                    editMessage(messageId, chatId, messageText);
-                }
-                break;
-            case 'copy':
-                if (typeof copyMessageText === 'function') {
-                    copyMessageText(messageText);
-                }
-                break;
-            case 'delete':
-                if (typeof deleteMessage === 'function') {
-                    deleteMessage(messageId, chatId);
-                }
-                break;
+        if (e.target.classList.contains('context-menu-item')) {
+            const action = e.target.dataset.action;
+            const messageId = this.dataset.messageId;
+            const chatId = this.dataset.chatId;
+            const messageText = this.dataset.messageText;
+            
+            if (action === 'edit') {
+                editMessage(messageId, chatId, messageText);
+            } else if (action === 'copy') {
+                copyMessageText(messageText);
+            } else if (action === 'delete') {
+                //deleteMessage(messageId, chatId);
+            }
+            
+            hideContextMenu();
         }
-
-        hideContextMenuUniversal();
     });
-
-    // 🔥 ЗАПУСКАЕМ
-    attachMessageListeners();
-    
-    // 🔥 ПЕРИОДИЧЕСКИ ОБНОВЛЯЕМ ОБРАБОТЧИКИ ДЛЯ НОВЫХ СООБЩЕНИЙ
-    setInterval(() => {
-        // Можно добавить дополнительную логику если нужно
-    }, 3000);
 
     console.log("✅ Long press инициализирован для мобильных устройств");
 }
+
 
 // Показать контекстное меню
 function showContextMenu(messageItem, x, y) {
