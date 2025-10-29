@@ -1633,6 +1633,7 @@ auth.onAuthStateChanged((user) => {
 
                     initContextMenu();
                     initMobileMenu();
+                    initChangeNameModal();
                     handleResize();
 
                     // Слушаем изменения размера окна
@@ -2189,6 +2190,47 @@ async function updateLastMessageInChat(chatId) {
     }
 }
 
+// Функция инициализации модального окна изменения имени
+function initChangeNameModal() {
+    const changeNameBtn = document.getElementById('change-name-btn');
+    const changeNameModal = document.getElementById('change-name-modal');
+    const closeBtn = changeNameModal.querySelector('.close');
+
+    if (!changeNameBtn || !changeNameModal) {
+        console.error('❌ Элементы модального окна изменения имени не найдены');
+        return;
+    }
+
+    // Обработчик открытия модального окна
+    changeNameBtn.addEventListener('click', () => {
+        console.log('✅ Открытие модального окна изменения имени');
+        changeNameModal.style.display = 'block';
+        
+        // Заполняем текущее имя
+        const newNameInput = document.getElementById('new-name');
+        if (newNameInput && currentUser) {
+            newNameInput.value = currentUser.name || '';
+            newNameInput.focus();
+        }
+    });
+
+    // Закрытие по крестику
+    closeBtn.addEventListener('click', () => {
+        changeNameModal.style.display = 'none';
+        document.getElementById('name-message').style.display = 'none';
+    });
+
+    // Закрытие по клику вне модального окна
+    window.addEventListener('click', (e) => {
+        if (e.target === changeNameModal) {
+            changeNameModal.style.display = 'none';
+            document.getElementById('name-message').style.display = 'none';
+        }
+    });
+
+    console.log("✅ Модальное окно изменения имени инициализировано");
+}
+
 let emailNotificationTimer = null;
 let currentEmailMessageId = null;
 let currentEmailChatId = null;
@@ -2365,9 +2407,8 @@ function initMobileMenu() {
      const menuToggle = document.querySelector('.menu-toggle');
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
-    const header = document.querySelector('.header');
 
-    if (!menuToggle || !usersPanel || !chatArea || !header) {
+    if (!menuToggle || !usersPanel || !chatArea) {
         console.error('❌ Элементы мобильного меню не найдены');
         return;
     }
@@ -2382,25 +2423,12 @@ function initMobileMenu() {
         menuToggle.innerHTML = '✕';
         menuToggle.style.background = '#ff416c';
         
-        usersPanel.style.cssText = `
-            position: fixed;
-            top: 60px;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            width: 100vw;
-            height: calc(100vh - 60px);
-            background: white;
-            z-index: 1001;
-            display: block !important;
-            overflow-y: auto;
-            padding: 20px;
-        `;
+        // Крестик остается на том же месте
+        menuToggle.style.left = '15px';
+        menuToggle.style.top = '50%';
+        menuToggle.style.transform = 'translateY(-50%)';
         
-        header.style.zIndex = '1003';
-        chatArea.style.display = 'none';
         document.body.style.overflow = 'hidden';
-        
         isPanelOpen = true;
         console.log('✅ Панель открыта');
     }
@@ -2413,16 +2441,15 @@ function initMobileMenu() {
         menuToggle.innerHTML = '☰';
         menuToggle.style.background = '#2575fc';
         
-        usersPanel.style.cssText = '';
-        header.style.zIndex = '';
-        chatArea.style.display = 'flex';
-        document.body.style.overflow = '';
+        // Убираем затемнение чата
+        chatArea.classList.remove('panel-open');
         
+        document.body.style.overflow = '';
         isPanelOpen = false;
         console.log('✅ Панель закрыта');
     }
 
-    // 🔥 ОБРАБОТЧИК КЛИКА ПО КНОПКЕ МЕНЮ (КРЕСТИК)
+    // Обработчик клика по кнопке меню
     menuToggle.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -2434,7 +2461,7 @@ function initMobileMenu() {
         }
     });
 
-    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ НА ЧАТ (ТОЛЬКО ЧАТ!)
+    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ НА ЧАТ
     chatArea.addEventListener('click', (e) => {
         if (isPanelOpen) {
             console.log('✅ Клик на чат - закрытие панели');
@@ -2442,28 +2469,58 @@ function initMobileMenu() {
         }
     });
 
-    // 🔥 УБИРАЕМ ВСЕ ДРУГИЕ ОБРАБОТЧИКИ ЗАКРЫТИЯ
-    // НИКАКИХ document.addEventListener для закрытия!
+    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ НА ОБЛАСТЬ СООБЩЕНИЙ (дополнительная защита)
+    const messagesContainer = document.getElementById('messages-container');
+    if (messagesContainer) {
+        messagesContainer.addEventListener('click', (e) => {
+            if (isPanelOpen) {
+                console.log('✅ Клик на сообщения - закрытие панели');
+                closeFullscreenPanel();
+            }
+        });
+    }
 
-    console.log("✅ Мобильное меню инициализировано - закрывается только по крестику или чату");
+    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ НА ПОЛЕ ВВОДА
+    const messageInput = document.getElementById('message-input');
+    if (messageInput) {
+        messageInput.addEventListener('click', (e) => {
+            if (isPanelOpen) {
+                console.log('✅ Клик на поле ввода - закрытие панели');
+                closeFullscreenPanel();
+            }
+        });
+    }
+
+    // 🔥 ЗАКРЫТИЕ ПРИ НАЧАЛЕ НАБОРА СООБЩЕНИЯ
+    if (messageInput) {
+        messageInput.addEventListener('focus', (e) => {
+            if (isPanelOpen) {
+                console.log('✅ Фокус на поле ввода - закрытие панели');
+                closeFullscreenPanel();
+            }
+        });
+    }
+
+    console.log("✅ Мобильное меню инициализировано - закрывается по крестику, чату и полю ввода");
 }
 
-// Обновите обработчик изменения размера окна
+// Также обновите функцию handleResize для корректной работы
 function handleResize() {
     const menuToggle = document.querySelector('.menu-toggle');
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
 
     if (window.innerWidth > 768) {
-        // Десктоп - скрываем кнопку
+        // Десктоп - скрываем кнопку и сбрасываем состояния
         if (menuToggle) {
             menuToggle.style.display = 'none';
         }
         if (usersPanel) {
-            usersPanel.classList.add('active');
+            usersPanel.classList.remove('active');
             usersPanel.style.cssText = '';
         }
         if (chatArea) {
+            chatArea.classList.remove('panel-open');
             chatArea.style.display = 'flex';
         }
     } else {
@@ -2474,6 +2531,9 @@ function handleResize() {
         if (usersPanel) {
             usersPanel.classList.remove('active');
             usersPanel.style.cssText = '';
+        }
+        if (chatArea) {
+            chatArea.classList.remove('panel-open');
         }
     }
 }
