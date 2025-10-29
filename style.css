@@ -1540,7 +1540,6 @@ button:disabled {
 @media (max-width: 480px) {
     .users-panel.active {
         bottom: 70px !important;
-        height: calc(100vh - 60px - 70px) !important;
         padding: 15px !important;
     }
     

@@ -2307,120 +2307,76 @@ function initMobileMenu() {
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
     const header = document.querySelector('.header');
+    const userSearchInput = document.getElementById('user-search');
 
     if (!menuToggle || !usersPanel || !chatArea || !header) {
         console.error('❌ Элементы мобильного меню не найдены');
         return;
     }
 
-    // 🔥 УДАЛЯЕМ СТАРЫЕ ОБРАБОТЧИКИ ПЕРЕД ДОБАВЛЕНИЕМ НОВЫХ
-    const newMenuToggle = menuToggle.cloneNode(true);
-    menuToggle.parentNode.replaceChild(newMenuToggle, menuToggle);
-
-    // 🔥 ПЕРЕМЕННАЯ ДЛЯ ОТСЛЕЖИВАНИЯ СОСТОЯНИЯ
     let isPanelOpen = false;
 
-    // 🔥 ФУНКЦИЯ ОТКРЫТИЯ ПАНЕЛИ
-function openFullscreenPanel() {
-    if (isPanelOpen) return;
-    
-    usersPanel.classList.add('active');
-    newMenuToggle.classList.add('active');
-    newMenuToggle.innerHTML = '✕';
-    newMenuToggle.style.position = 'fixed';
-    newMenuToggle.style.top = '15px';
-    newMenuToggle.style.left = '15px';
-    newMenuToggle.style.zIndex = '1002';
-    newMenuToggle.style.background = '#2575fc';
-    newMenuToggle.style.color = 'white';
-    
-    // 🔥 ПАНЕЛЬ НА ВЕСЬ ЭКРАН, НО ОСТАВЛЯЕМ МЕСТО ДЛЯ ПОЛЯ ВВОДА
-    usersPanel.style.cssText = `
-        position: fixed;
-        top: 60px; /* Header */
-        left: 0;
-        right: 0;
-        bottom: 80px; /* 🔥 МЕСТО ДЛЯ ПОЛЯ ВВОДА СООБЩЕНИЯ */
-        width: 100vw;
-        height: calc(100vh - 60px - 80px); /* 🔥 УЧИТЫВАЕМ ПОЛЕ ВВОДА */
-        background: white;
-        z-index: 1001;
-        display: block !important;
-        overflow-y: auto;
-        padding: 20px;
-        border-radius: 20px 20px 0 0;
-        box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
-    `;
-    
-    header.style.zIndex = '1003';
-    
-    // 🔥 НЕ СКРЫВАЕМ ЧАТ ПОЛНОСТЬЮ, А ДЕЛАЕМ ЕГО ПРОЗРАЧНЫМ
-    chatArea.style.opacity = '0.3';
-    chatArea.style.pointerEvents = 'none';
-    
-    // 🔥 ГАРАНТИРУЕМ ЧТО ПОЛЕ ВВОДА ВИДИМО И ДОСТУПНО
-    const messageInputContainer = document.querySelector('.message-input-container');
-    if (messageInputContainer) {
-        messageInputContainer.style.cssText = `
-            position: fixed !important;
-            bottom: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            background: #f8f9fa !important;
-            padding: 12px !important;
-            border-top: 1px solid #e0e0e0 !important;
-            z-index: 1004 !important; /* 🔥 ВЫСОКИЙ Z-INDEX */
-            display: flex !important;
-            gap: 10px !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-            pointer-events: all !important;
+    function openFullscreenPanel() {
+        if (isPanelOpen) return;
+        
+        usersPanel.classList.add('active');
+        menuToggle.classList.add('active');
+        menuToggle.innerHTML = '✕';
+        menuToggle.style.position = 'fixed';
+        menuToggle.style.top = '15px';
+        menuToggle.style.left = '15px';
+        menuToggle.style.zIndex = '1002';
+        menuToggle.style.background = '#2575fc';
+        menuToggle.style.color = 'white';
+        
+        usersPanel.style.cssText = `
+            position: fixed;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100vw;
+            height: calc(100vh - 60px);
+            background: white;
+            z-index: 1001;
+            display: block !important;
+            overflow-y: auto;
+            padding: 20px;
         `;
+        
+        header.style.zIndex = '1003';
+        chatArea.style.display = 'none';
+        document.body.style.overflow = 'hidden';
+        
+        isPanelOpen = true;
+        console.log('✅ Панель открыта');
     }
-    
-    document.body.style.overflow = 'hidden';
-    
-    isPanelOpen = true;
-    console.log('✅ Панель открыта, поле ввода видимо');
-}
 
-    // 🔥 ФУНКЦИЯ ЗАКРЫТИЯ ПАНЕЛИ
     function closeFullscreenPanel() {
         if (!isPanelOpen) return;
-    
-    usersPanel.classList.remove('active');
-    newMenuToggle.classList.remove('active');
-    newMenuToggle.innerHTML = '☰';
-    newMenuToggle.style.position = '';
-    newMenuToggle.style.top = '';
-    newMenuToggle.style.left = '';
-    newMenuToggle.style.background = '';
-    newMenuToggle.style.color = '';
-    
-    usersPanel.style.cssText = '';
-    header.style.zIndex = '';
-    
-    // 🔥 ВОССТАНАВЛИВАЕМ ЧАТ
-    chatArea.style.opacity = '1';
-    chatArea.style.pointerEvents = '';
-    
-    // 🔥 ВОССТАНАВЛИВАЕМ ПОЛЕ ВВОДА
-    const messageInputContainer = document.querySelector('.message-input-container');
-    if (messageInputContainer) {
-        messageInputContainer.style.cssText = '';
-    }
-    
-    document.body.style.overflow = '';
-    
-    isPanelOpen = false;
-    console.log('✅ Панель закрыта, поле ввода восстановлено');
+        
+        usersPanel.classList.remove('active');
+        menuToggle.classList.remove('active');
+        menuToggle.innerHTML = '☰';
+        menuToggle.style.position = '';
+        menuToggle.style.top = '';
+        menuToggle.style.left = '';
+        menuToggle.style.background = '';
+        menuToggle.style.color = '';
+        
+        usersPanel.style.cssText = '';
+        header.style.zIndex = '';
+        chatArea.style.display = 'flex';
+        document.body.style.overflow = '';
+        
+        isPanelOpen = false;
+        console.log('✅ Панель закрыта');
     }
 
     // 🔥 ОБРАБОТЧИК КЛИКА ПО КНОПКЕ МЕНЮ
-    newMenuToggle.addEventListener('click', (e) => {
+    menuToggle.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        console.log('🔄 Клик по menu-toggle');
         
         if (isPanelOpen) {
             closeFullscreenPanel();
@@ -2429,23 +2385,50 @@ function openFullscreenPanel() {
         }
     });
 
-    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ПОЛЬЗОВАТЕЛЯ
+    // 🔥 ИСПРАВЛЕННОЕ ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ ПАНЕЛИ
     document.addEventListener('click', (e) => {
-        if (window.innerWidth <= 768 && 
-            isPanelOpen && 
-            e.target.closest('.user-item')) {
+        if (isPanelOpen) {
+            // 🔥 ИСКЛЮЧАЕМ ПОЛЕ ВВОДА ПОИСКА ИЗ ЗАКРЫТИЯ
+            const isSearchInput = e.target === userSearchInput || 
+                                 e.target.closest('#user-search') ||
+                                 e.target.closest('.search-container');
+            
+            // 🔥 ИСКЛЮЧАЕМ КНОПКУ ПОИСКА
+            const isSearchButton = e.target.id === 'search-btn' || 
+                                  e.target.closest('#search-btn');
+            
+            // 🔥 ИСКЛЮЧАЕМ КНОПКУ ОЧИСТКИ ПОИСКА
+            const isClearButton = e.target.id === 'clear-search' || 
+                                 e.target.closest('#clear-search');
+            
+            // 🔥 ИСКЛЮЧАЕМ РЕЗУЛЬТАТЫ ПОИСКА
+            const isSearchResults = e.target.closest('#search-results');
+            
+            // 🔥 ЗАКРЫВАЕМ ТОЛЬКО ЕСЛИ КЛИК НЕ ПО ЭЛЕМЕНТАМ ПОИСКА
+            if (!usersPanel.contains(e.target) && 
+                e.target !== menuToggle && 
+                !menuToggle.contains(e.target) &&
+                !isSearchInput &&
+                !isSearchButton &&
+                !isClearButton &&
+                !isSearchResults) {
+                closeFullscreenPanel();
+            }
+        }
+    });
+
+    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ПОЛЬЗОВАТЕЛЯ ИЗ СПИСКА
+    document.addEventListener('click', (e) => {
+        if (isPanelOpen && e.target.closest('.user-item')) {
             console.log('✅ Выбор пользователя - закрытие панели');
             closeFullscreenPanel();
         }
     });
 
-    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ ПАНЕЛИ
+    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ПОЛЬЗОВАТЕЛЯ ИЗ РЕЗУЛЬТАТОВ ПОИСКА
     document.addEventListener('click', (e) => {
-        if (isPanelOpen && 
-            !usersPanel.contains(e.target) && 
-            e.target !== newMenuToggle && 
-            !newMenuToggle.contains(e.target)) {
-            console.log('✅ Клик вне панели - закрытие');
+        if (isPanelOpen && e.target.closest('.search-result-item')) {
+            console.log('✅ Выбор из результатов поиска - закрытие панели');
             closeFullscreenPanel();
         }
     });
@@ -2458,15 +2441,34 @@ function openFullscreenPanel() {
         }
     });
 
-    // 🔥 ОБРАБОТКА ИЗМЕНЕНИЯ РАЗМЕРА ОКНА
-    window.addEventListener('resize', () => {
-        if (window.innerWidth > 768 && isPanelOpen) {
-            console.log('✅ Изменение размера - закрытие панели');
-            closeFullscreenPanel();
-        }
-    });
+    // 🔥 ОБРАБОТКА ФОКУСА НА ПОЛЕ ВВОДА - НЕ ЗАКРЫВАЕМ ПАНЕЛЬ
+    if (userSearchInput) {
+        userSearchInput.addEventListener('focus', () => {
+            console.log('🔍 Фокус на поле поиска - панель остается открытой');
+        });
+        
+        userSearchInput.addEventListener('click', (e) => {
+            e.stopPropagation(); // 🔥 ПРЕДОТВРАЩАЕМ ВСПЛЫТИЕ
+        });
+    }
 
-    console.log("✅ Мобильное меню инициализировано для текущего пользователя");
+    // 🔥 ОБРАБОТКА КНОПКИ ПОИСКА - НЕ ЗАКРЫВАЕМ ПАНЕЛЬ
+    const searchBtn = document.getElementById('search-btn');
+    if (searchBtn) {
+        searchBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // 🔥 ПРЕДОТВРАЩАЕМ ВСПЛЫТИЕ
+        });
+    }
+
+    // 🔥 ОБРАБОТКА КНОПКИ ОЧИСТКИ - НЕ ЗАКРЫВАЕМ ПАНЕЛЬ
+    const clearBtn = document.getElementById('clear-search');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // 🔥 ПРЕДОТВРАЩАЕМ ВСПЛЫТИЕ
+        });
+    }
+
+    console.log("✅ Мобильное меню инициализировано с защитой поля поиска");
 }
 
 // Обновите обработчик изменения размера окна
