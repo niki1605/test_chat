@@ -435,22 +435,33 @@ function clearSearch() {
 
 // Загрузка пользователей с активными чатами (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 function loadActiveChats() {
+   // 🔥 ПРОВЕРКА currentUser
+    if (!currentUser || !currentUser.uid) {
+        console.error('❌ loadActiveChats: currentUser не определен');
+        return;
+    }
+
     if (usersListener) {
         usersListener();
     }
-    
+
     usersListener = db.collection('chats')
         .where('participants', 'array-contains', currentUser.uid)
         .onSnapshot(async (snapshot) => {
-            const usersList = document.getElementById('users-list');
+            // 🔥 ПРОВЕРКА ЧТО currentUser ВСЕ ЕЩЕ СУЩЕСТВУЕТ
+            if (!currentUser || !currentUser.uid) {
+                console.log('ℹ️ Слушатель чатов: currentUser удален');
+                return;
+            }
             
-            // Не очищаем список сразу, чтобы не было мигания
+            const usersList = document.getElementById('users-list');
+            if (!usersList) return;
+
             if (snapshot.empty) {
                 usersList.innerHTML = '<div class="no-results">Нет активных чатов</div>';
                 return;
             }
-            
-            // Создаем временный контейнер для новых элементов
+
             const tempContainer = document.createElement('div');
             
             for (const doc of snapshot.docs) {
@@ -459,49 +470,25 @@ function loadActiveChats() {
                 
                 if (otherUserId) {
                     try {
-                        // Получаем данные пользователя
                         const userDoc = await db.collection('users').doc(otherUserId).get();
                         if (userDoc.exists) {
                             const userData = userDoc.data();
                             const unreadCount = await getUnreadCount(otherUserId);
                             
-                            const userItem = document.createElement('div');
-                            userItem.className = 'user-item';
-                            userItem.dataset.userId = otherUserId;
-                            
-                            // Получаем последнее сообщение из подколлекции messages
-                            const lastMessage = await getLastMessage(otherUserId);
-                            
-                            userItem.innerHTML = `
-                                <div class="user-info-content">
-                                    <span class="status ${userData.online ? 'online' : 'offline'}"></span>
-                                    <div>
-                                        <div>${userData.name}</div>
-                                        <div class="user-last-message">
-                                            ${lastMessage || 'Нет сообщений'}
-                                        </div>
-                                    </div>
-                                    ${unreadCount > 0 ? `<div class="unread-count">${unreadCount}</div>` : ''}
-                                </div>
-                            `;
-                            
-                            userItem.addEventListener('click', () => {
-                                selectUserForChat(otherUserId, userData);
-                            });
-                            
+                            // Создаем элемент пользователя
+                            const userItem = createUserItem(otherUserId, userData, unreadCount);
                             tempContainer.appendChild(userItem);
                         }
                     } catch (error) {
-                        console.error('Ошибка загрузки пользователя:', error);
+                        console.error('❌ Ошибка загрузки пользователя:', error);
                     }
                 }
             }
-            
-            // Заменяем содержимое списка
+
             usersList.innerHTML = '';
             usersList.appendChild(tempContainer);
         }, (error) => {
-            console.error('Ошибка загрузки чатов:', error);
+            console.error('❌ Ошибка загрузки чатов:', error);
         });
 }
 
@@ -1416,10 +1403,22 @@ async function markMessagesAsRead(otherUserId) {
 
 // Слушатель для обновления счетчиков непрочитанных в реальном времени
 function startUnreadCountListener() {
+    // 🔥 ПРОВЕРКА currentUser
+    if (!currentUser || !currentUser.uid) {
+        console.error('❌ startUnreadCountListener: currentUser не определен');
+        return () => {}; // Возвращаем пустую функцию
+    }
+
     // Слушаем все чаты текущего пользователя
     return db.collection('chats')
         .where('participants', 'array-contains', currentUser.uid)
         .onSnapshot(async (snapshot) => {
+            // 🔥 ПРОВЕРКА ЧТО currentUser ВСЕ ЕЩЕ СУЩЕСТВУЕТ
+            if (!currentUser || !currentUser.uid) {
+                console.log('ℹ️ Слушатель непрочитанных: currentUser удален');
+                return;
+            }
+            
             for (const doc of snapshot.docs) {
                 const chatData = doc.data();
                 const otherUserId = chatData.participants.find(id => id !== currentUser.uid);
@@ -1429,8 +1428,11 @@ function startUnreadCountListener() {
                     updateUnreadCount(otherUserId, unreadCount);
                 }
             }
+        }, (error) => {
+            console.error('❌ Ошибка слушателя непрочитанных:', error);
         });
-}
+
+    }
 
 // Получение количества непрочитанных сообщений
 async function getUnreadCount(otherUserId) {
@@ -1626,6 +1628,9 @@ auth.onAuthStateChanged((user) => {
             });
         initSimpleModals();
     } else {
+
+ handleUserLogout();
+
         // Пользователь вышел из системы
         currentUser = null;
         
@@ -1677,6 +1682,153 @@ auth.onAuthStateChanged((user) => {
         document.getElementById('register-message').style.display = 'none';
     }
 });
+
+// 🔥 НОВАЯ ФУНКЦИЯ ДЛЯ ОБРАБОТКИ ВЫХОДА
+function handleUserLogout() {
+    console.log('🔒 Выход из системы - очистка состояния...');
+    
+    // 🔥 ОСТАНАВЛИВАЕМ ВСЕ СЛУШАТЕЛИ
+    stopAllListeners();
+    
+    // 🔥 СБРАСЫВАЕМ ВСЕ ПЕРЕМЕННЫЕ СОСТОЯНИЯ
+    currentUser = null;
+    selectedChatUser = null;
+    
+    // 🔥 СБРАСЫВАЕМ СОСТОЯНИЕ ИНТЕРФЕЙСА
+    resetChatState();
+    resetUIState();
+    
+    // 🔥 ПЕРЕКЛЮЧАЕМ НА ФОРМЫ АВТОРИЗАЦИИ
+    switchToAuthForms();
+}
+
+// 🔥 ФУНКЦИЯ ОСТАНОВКИ ВСЕХ СЛУШАТЕЛЕЙ
+function stopAllListeners() {
+    console.log('🛑 Остановка всех слушателей...');
+    
+    // Остановка слушателя сообщений
+    if (messagesListener) {
+        messagesListener();
+        messagesListener = null;
+    }
+    
+    // Остановка слушателя пользователей
+    if (usersListener) {
+        usersListener();
+        usersListener = null;
+    }
+    
+    // Остановка слушателя поиска
+    if (searchResultsListener) {
+        searchResultsListener();
+        searchResultsListener = null;
+    }
+    
+    // Остановка слушателя непрочитанных сообщений
+    if (unreadCountListener) {
+        unreadCountListener();
+        unreadCountListener = null;
+    }
+    
+    // Остановка таймеров поиска
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
+    }
+    
+    // Остановка таймеров email уведомлений
+    if (emailNotificationTimer) {
+        clearInterval(emailNotificationTimer);
+        emailNotificationTimer = null;
+    }
+    
+    // Остановка таймеров верификации
+    if (verificationTimer) {
+        clearInterval(verificationTimer);
+        verificationTimer = null;
+    }
+    
+    if (resendTimeout) {
+        clearTimeout(resendTimeout);
+        resendTimeout = null;
+    }
+}
+
+// 🔥 ФУНКЦИЯ СБРОСА ИНТЕРФЕЙСА
+function resetUIState() {
+    console.log('🔄 Сброс интерфейса...');
+    
+    // Закрываем мобильную панель если открыта
+    const usersPanel = document.querySelector('.users-panel');
+    const menuToggle = document.querySelector('.menu-toggle');
+    if (usersPanel) {
+        usersPanel.classList.remove('active');
+        usersPanel.style.cssText = '';
+    }
+    if (menuToggle) {
+        menuToggle.classList.remove('active');
+        menuToggle.innerHTML = '☰';
+        menuToggle.style.cssText = '';
+    }
+    
+    // Очищаем списки
+    const usersList = document.getElementById('users-list');
+    const searchResults = document.getElementById('search-results');
+    if (usersList) usersList.innerHTML = '';
+    if (searchResults) searchResults.innerHTML = '';
+    
+    // Разблокируем скролл
+    document.body.style.overflow = '';
+}
+
+// 🔥 ФУНКЦИЯ ПЕРЕКЛЮЧЕНИЯ НА ФОРМЫ АВТОРИЗАЦИИ
+function switchToAuthForms() {
+    console.log('🔐 Переключение на формы авторизации...');
+    
+    mainApp.style.display = 'none';
+    authSection.style.display = 'block';
+
+    // Очистка форм
+    document.getElementById('loginForm').reset();
+    document.getElementById('registerForm').reset();
+    document.getElementById('login-message').style.display = 'none';
+    document.getElementById('register-message').style.display = 'none';
+    
+    // Сброс состояния верификации email
+    emailVerificationCode = null;
+    toggleVerificationSection(false);
+}
+
+// 🔥 ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ СОЗДАНИЯ ЭЛЕМЕНТА ПОЛЬЗОВАТЕЛЯ
+function createUserItem(userId, userData, unreadCount) {
+    const userItem = document.createElement('div');
+    userItem.className = 'user-item';
+    userItem.dataset.userId = userId;
+
+    // Получаем последнее сообщение
+    getLastMessage(userId).then(lastMessage => {
+        userItem.innerHTML = `
+            <div class="user-info-content">
+                <span class="status ${userData.online ? 'online' : 'offline'}"></span>
+                <div>
+                    <div>${userData.name}</div>
+                    <div class="user-last-message">
+                        ${lastMessage || 'Нет сообщений'}
+                    </div>
+                </div>
+                ${unreadCount > 0 ? `<div class="unread-count">${unreadCount}</div>` : ''}
+            </div>
+        `;
+    });
+
+    userItem.addEventListener('click', () => {
+        if (currentUser && currentUser.uid) { // 🔥 ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА
+            selectUserForChat(userId, userData);
+        }
+    });
+
+    return userItem;
+}
 
 // Обновление времени последней активности
 window.addEventListener('beforeunload', () => {
@@ -2158,122 +2310,133 @@ async function sendEmailNow(messageId, chatId) {
 }
 
 function initMobileMenu() {
-        const menuToggle = document.querySelector('.menu-toggle');
+       const menuToggle = document.querySelector('.menu-toggle');
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
-    const mainApp = document.getElementById('main-app');
+    const header = document.querySelector('.header');
 
-    if (!menuToggle || !usersPanel || !chatArea) {
+    if (!menuToggle || !usersPanel || !chatArea || !header) {
         console.error('❌ Элементы мобильного меню не найдены');
         return;
     }
 
-    menuToggle.addEventListener('click', () => {
-        const isOpening = !usersPanel.classList.contains('active');
+    // 🔥 УДАЛЯЕМ СТАРЫЕ ОБРАБОТЧИКИ ПЕРЕД ДОБАВЛЕНИЕМ НОВЫХ
+    const newMenuToggle = menuToggle.cloneNode(true);
+    menuToggle.parentNode.replaceChild(newMenuToggle, menuToggle);
+
+    // 🔥 ПЕРЕМЕННАЯ ДЛЯ ОТСЛЕЖИВАНИЯ СОСТОЯНИЯ
+    let isPanelOpen = false;
+
+    // 🔥 ФУНКЦИЯ ОТКРЫТИЯ ПАНЕЛИ
+    function openFullscreenPanel() {
+        if (isPanelOpen) return;
         
-        if (isOpening) {
-            // Открываем панель на весь экран
-            openFullscreenPanel();
-        } else {
-            // Закрываем панель
+        usersPanel.classList.add('active');
+        newMenuToggle.classList.add('active');
+        newMenuToggle.innerHTML = '✕';
+        newMenuToggle.style.position = 'fixed';
+        newMenuToggle.style.top = '15px';
+        newMenuToggle.style.left = '15px';
+        newMenuToggle.style.zIndex = '1002';
+        newMenuToggle.style.background = '#2575fc';
+        newMenuToggle.style.color = 'white';
+        
+        usersPanel.style.cssText = `
+            position: fixed;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100vw;
+            height: calc(100vh - 60px);
+            background: white;
+            z-index: 1001;
+            display: block !important;
+            overflow-y: auto;
+            padding: 20px;
+        `;
+        
+        header.style.zIndex = '1003';
+        chatArea.style.display = 'none';
+        document.body.style.overflow = 'hidden';
+        
+        isPanelOpen = true;
+        console.log('✅ Панель открыта');
+    }
+
+    // 🔥 ФУНКЦИЯ ЗАКРЫТИЯ ПАНЕЛИ
+    function closeFullscreenPanel() {
+        if (!isPanelOpen) return;
+        
+        usersPanel.classList.remove('active');
+        newMenuToggle.classList.remove('active');
+        newMenuToggle.innerHTML = '☰';
+        newMenuToggle.style.position = '';
+        newMenuToggle.style.top = '';
+        newMenuToggle.style.left = '';
+        newMenuToggle.style.background = '';
+        newMenuToggle.style.color = '';
+        
+        usersPanel.style.cssText = '';
+        header.style.zIndex = '';
+        chatArea.style.display = 'flex';
+        document.body.style.overflow = '';
+        
+        isPanelOpen = false;
+        console.log('✅ Панель закрыта');
+    }
+
+    // 🔥 ОБРАБОТЧИК КЛИКА ПО КНОПКЕ МЕНЮ
+    newMenuToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🔄 Клик по menu-toggle');
+        
+        if (isPanelOpen) {
             closeFullscreenPanel();
+        } else {
+            openFullscreenPanel();
         }
     });
 
-    // Функция открытия панели на весь экран
-    function openFullscreenPanel() {
-         usersPanel.classList.add('active');
-    menuToggle.classList.add('active');
-    menuToggle.innerHTML = '✕';
-    menuToggle.style.position = 'fixed';
-    menuToggle.style.top = '15px';
-    menuToggle.style.left = '15px';
-    menuToggle.style.zIndex = '1002';
-    menuToggle.style.background = '#2575fc';
-    menuToggle.style.color = 'white';
-    
-    // Панель на весь экран, но оставляем место для header
-    usersPanel.style.cssText = `
-        position: fixed;
-        top: 60px; /* 🔥 ОСТАВЛЯЕМ МЕСТО ДЛЯ HEADER */
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100vw;
-        height: calc(100vh - 60px); /* 🔥 ВЫЧИТАЕМ ВЫСОТУ HEADER */
-        background: white;
-        z-index: 1001;
-        display: block !important;
-        overflow-y: auto;
-        padding: 20px;
-    `;
-    
-    // Header должен быть поверх панели
-    const header = document.querySelector('.header');
-    if (header) {
-        header.style.zIndex = '1003'; /* 🔥 HEADER ПОВЫШЕ */
-        header.style.position = 'relative'; /* 🔥 ЧТОБЫ БЫЛ ВИДИМ */
-    }
-    
-    // Скрываем чат
-    chatArea.style.display = 'none';
-    
-    // Блокируем скролл body
-    document.body.style.overflow = 'hidden';
-    }
-
-    // Функция закрытия панели
-    function closeFullscreenPanel() {
-        usersPanel.classList.remove('active');
-    menuToggle.classList.remove('active');
-    menuToggle.innerHTML = '☰';
-    menuToggle.style.position = '';
-    menuToggle.style.top = '';
-    menuToggle.style.left = '';
-    menuToggle.style.background = '';
-    menuToggle.style.color = '';
-    
-    // Возвращаем обычные стили
-    usersPanel.style.cssText = '';
-    
-    // Возвращаем header в нормальное состояние
-    const header = document.querySelector('.header');
-    if (header) {
-        header.style.zIndex = '';
-        header.style.position = '';
-    }
-    
-    // Показываем чат
-    chatArea.style.display = 'flex';
-    
-    // Разблокируем скролл body
-    document.body.style.overflow = '';
-    }
-
-    // Закрытие панели при выборе пользователя
+    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ПОЛЬЗОВАТЕЛЯ
     document.addEventListener('click', (e) => {
         if (window.innerWidth <= 768 && 
-            usersPanel.classList.contains('active') && 
+            isPanelOpen && 
             e.target.closest('.user-item')) {
+            console.log('✅ Выбор пользователя - закрытие панели');
             closeFullscreenPanel();
         }
     });
 
-    // Закрытие панели при клике вне ее (оверлей)
-    usersPanel.addEventListener('click', (e) => {
-        if (e.target === usersPanel) {
+    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ ПАНЕЛИ
+    document.addEventListener('click', (e) => {
+        if (isPanelOpen && 
+            !usersPanel.contains(e.target) && 
+            e.target !== newMenuToggle && 
+            !newMenuToggle.contains(e.target)) {
+            console.log('✅ Клик вне панели - закрытие');
             closeFullscreenPanel();
         }
     });
 
-    // Закрытие панели при нажатии Escape
+    // 🔥 ЗАКРЫТИЕ ПРИ НАЖАТИИ ESC
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && usersPanel.classList.contains('active')) {
+        if (e.key === 'Escape' && isPanelOpen) {
+            console.log('✅ Escape - закрытие панели');
             closeFullscreenPanel();
         }
     });
 
-    console.log("✅ Мобильное меню инициализировано");
+    // 🔥 ОБРАБОТКА ИЗМЕНЕНИЯ РАЗМЕРА ОКНА
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768 && isPanelOpen) {
+            console.log('✅ Изменение размера - закрытие панели');
+            closeFullscreenPanel();
+        }
+    });
+
+    console.log("✅ Мобильное меню инициализировано для текущего пользователя");
 }
 
 // Обновите обработчик изменения размера окна

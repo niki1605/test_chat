@@ -1476,22 +1476,23 @@ button:disabled {
 @media (max-width: 768px) {
     .users-panel.active {
         position: fixed !important;
-        top: 60px !important; /* 🔥 ОСТАВЛЯЕМ МЕСТО ДЛЯ HEADER */
+        top: 60px !important; /* Header */
         left: 0 !important;
         right: 0 !important;
-        bottom: 0 !important;
+        bottom: 80px !important; /* 🔥 МЕСТО ДЛЯ АДРЕСНОЙ СТРОКИ БРАУЗЕРА */
         width: 100vw !important;
-        height: calc(100vh - 60px) !important; /* 🔥 ВЫЧИТАЕМ HEADER */
+        height: calc(100vh - 60px - 80px) !important; /* 🔥 УЧИТЫВАЕМ ВСЕ */
         background: white !important;
         z-index: 1001 !important;
         display: block !important;
         overflow-y: auto !important;
         padding: 20px !important;
-        border-radius: 0 !important;
+        border-radius: 20px 20px 0 0 !important; /* 🔥 ЗАКРУГЛЕННЫЕ ВЕРХНИЕ УГЛЫ */
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.1) !important; /* 🔥 ТЕНЬ */
     }
     
     .header {
-        z-index: 1003 !important; /* 🔥 HEADER ПОВЫШЕ ПАНЕЛИ */
+        z-index: 1003 !important;
         position: relative !important;
         background: white !important;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
@@ -1501,27 +1502,45 @@ button:disabled {
         position: fixed !important;
         top: 15px !important;
         left: 15px !important;
-        z-index: 1004 !important; /* 🔥 КНОПКА САМАЯ ВЫСОКАЯ */
+        z-index: 1004 !important;
         background: #2575fc !important;
         color: white !important;
     }
     
+    /* 🔥 ЧАТ ПРИ ОТКРЫТОЙ ПАНЕЛИ */
     .chat-area {
         transition: opacity 0.3s ease;
     }
     
-    /* Убедимся что header всегда виден */
-    .main-app .header {
-        display: flex !important;
-        visibility: visible !important;
-        opacity: 1 !important;
+    .users-panel.active ~ .chat-area {
+        opacity: 0.3 !important;
+        pointer-events: none !important;
     }
 }
 
-/* Для очень маленьких экранов */
-@media (max-width: 480px) {
+/* 🔥 АДАПТИВНОСТЬ ДЛЯ РАЗНЫХ ВЫСОТ АДРЕСНОЙ СТРОКИ */
+@media (max-height: 700px) {
+    /* Для устройств с маленькой высотой экрана */
     .users-panel.active {
-        top: 50px !important; /* 🔥 МЕНЬШИЙ HEADER */
-        height: calc(100vh - 50px) !important;
+        bottom: 60px !important;
+        height: calc(100vh - 60px - 60px) !important;
+    }
+}
+
+@media (max-height: 600px) {
+    /* Для очень маленьких экранов */
+    .users-panel.active {
+        bottom: 50px !important;
+        height: calc(100vh - 60px - 50px) !important;
+        padding: 15px !important;
+    }
+}
+
+/* 🔥 iOS Safari специфичные стили */
+@supports (-webkit-touch-callout: none) {
+    .users-panel.active {
+        bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+        height: calc(100vh - 60px - 80px - env(safe-area-inset-bottom)) !important;
+        padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important;
     }
 }
