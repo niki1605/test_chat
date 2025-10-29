@@ -1419,17 +1419,9 @@ button:disabled {
         overflow-y: auto;
     }
 
-    .message-input-container {
-        padding: 15px 15px 30px 15px !important; /* Увеличиваем нижний padding */
-        background: white;
-        position: relative;
-        z-index: 100;
-    }
-
-    .message-input-container {
-        padding: 15px 15px 30px 15px !important; /* Увеличиваем нижний padding */
-        background: white;
-        position: relative;
-        z-index: 100;
+   .messages-container {
+        flex: 1;
+        min-height: 0;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 }
