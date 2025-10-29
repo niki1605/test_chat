@@ -1419,9 +1419,8 @@ button:disabled {
         overflow-y: auto;
     }
 
-   .messages-container {
-        flex: 1;
-        min-height: 0;
-        padding-bottom: env(safe-area-inset-bottom, 0px);
+   .message-input-container input {
+        min-height: 60px;
+        font-size: 16px; /* Предотвращает масштабирование в iOS */
     }
 }
