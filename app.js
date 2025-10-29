@@ -1972,46 +1972,65 @@ function toggleVerificationSection(show) {
 // Инициализация модальных окон
 function initSimpleModals() {
     // Модальное окно восстановления пароля
-    forgotPasswordModal = document.getElementById('forgot-password-modal');
+    const forgotPasswordModal = document.getElementById('forgot-password-modal');
     const forgotPasswordLink = document.getElementById('forgot-password-link');
     const closeForgotPassword = forgotPasswordModal.querySelector('.close');
-    
+
+    // 🔥 ОБРАБОТЧИК ДЛЯ ССЫЛКИ "ЗАБЫЛИ ПАРОЛЬ"
     forgotPasswordLink.addEventListener('click', (e) => {
         e.preventDefault();
+        console.log('✅ Клик по "Забыли пароль"');
         forgotPasswordModal.style.display = 'block';
     });
-    
+
+    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ НА КРЕСТИК
     closeForgotPassword.addEventListener('click', () => {
         forgotPasswordModal.style.display = 'none';
         document.getElementById('reset-message').style.display = 'none';
     });
-    
-    // Модальное окно изменения имени
-    changeNameModal = document.getElementById('change-name-modal');
-    const changeNameBtn = document.getElementById('change-name-btn');
-    const closeChangeName = changeNameModal.querySelector('.close');
-    
-    changeNameBtn.addEventListener('click', () => {
-        document.getElementById('new-name').value = currentUser.name || '';
-        changeNameModal.style.display = 'block';
+
+    // 🔥 ОБРАБОТЧИК ФОРМЫ ВОССТАНОВЛЕНИЯ ПАРОЛЯ
+    document.getElementById('forgot-password-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('reset-email').value;
+        const messageDiv = document.getElementById('reset-message');
+
+        try {
+            await auth.sendPasswordResetEmail(email);
+            messageDiv.textContent = 'Ссылка для сброса пароля отправлена на ваш email!';
+            messageDiv.className = 'message success';
+            messageDiv.style.display = 'block';
+
+            // Очистка формы и закрытие модального окна через 3 секунды
+            setTimeout(() => {
+                forgotPasswordModal.style.display = 'none';
+                document.getElementById('forgot-password-form').reset();
+                messageDiv.style.display = 'none';
+            }, 3000);
+        } catch (error) {
+            let errorMessage = 'Ошибка отправки ссылки для сброса пароля';
+            if (error.code === 'auth/user-not-found') {
+                errorMessage = 'Пользователь с таким email не найден';
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage = 'Некорректный email';
+            } else if (error.code === 'auth/network-request-failed') {
+                errorMessage = 'Проблема с сетью. Проверьте подключение к интернету';
+            }
+            messageDiv.textContent = errorMessage;
+            messageDiv.className = 'message error';
+            messageDiv.style.display = 'block';
+        }
     });
-    
-    closeChangeName.addEventListener('click', () => {
-        changeNameModal.style.display = 'none';
-        document.getElementById('name-message').style.display = 'none';
-    });
-    
-    // Закрытие модальных окон при клике вне их
+
+    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ МОДАЛЬНОГО ОКНА
     window.addEventListener('click', (e) => {
         if (e.target === forgotPasswordModal) {
             forgotPasswordModal.style.display = 'none';
             document.getElementById('reset-message').style.display = 'none';
         }
-        if (e.target === changeNameModal) {
-            changeNameModal.style.display = 'none';
-            document.getElementById('name-message').style.display = 'none';
-        }
     });
+
+    console.log("✅ Модальные окна инициализированы");
 }
 
 // Восстановление пароля
@@ -2343,7 +2362,7 @@ async function sendEmailNow(messageId, chatId) {
 }
 
 function initMobileMenu() {
-  const menuToggle = document.querySelector('.menu-toggle');
+     const menuToggle = document.querySelector('.menu-toggle');
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
     const header = document.querySelector('.header');
@@ -2403,7 +2422,7 @@ function initMobileMenu() {
         console.log('✅ Панель закрыта');
     }
 
-    // 🔥 ОБРАБОТЧИК КЛИКА ПО КНОПКЕ МЕНЮ
+    // 🔥 ОБРАБОТЧИК КЛИКА ПО КНОПКЕ МЕНЮ (КРЕСТИК)
     menuToggle.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -2415,76 +2434,18 @@ function initMobileMenu() {
         }
     });
 
-    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ПОЛЬЗОВАТЕЛЯ ИЗ СПИСКА
-    document.addEventListener('click', (e) => {
-        if (isPanelOpen && e.target.closest('.user-item')) {
-            console.log('✅ Выбор пользователя - закрытие панели');
-            closeFullscreenPanel();
-        }
-    });
-
-    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ИЗ РЕЗУЛЬТАТОВ ПОИСКА
-    document.addEventListener('click', (e) => {
-        if (isPanelOpen && e.target.closest('.search-result-item')) {
-            console.log('✅ Выбор из результатов поиска - закрытие панели');
-            closeFullscreenPanel();
-        }
-    });
-
-    // 🔥 ИСПРАВЛЕННОЕ ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ ПАНЕЛИ
-    document.addEventListener('click', (e) => {
+    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ НА ЧАТ (ТОЛЬКО ЧАТ!)
+    chatArea.addEventListener('click', (e) => {
         if (isPanelOpen) {
-            // 🔥 СПИСОК ЭЛЕМЕНТОВ, КОТОРЫЕ НЕ ДОЛЖНЫ ЗАКРЫВАТЬ ПАНЕЛЬ
-            const safeElements = [
-                '.search-container',
-                '#user-search', 
-                '#search-btn',
-                '#clear-search',
-                '#search-results',
-                '.search-result-item',
-                '.users-panel',
-                '.menu-toggle',
-                '.user-item',
-                '.active-chats-section',
-                '.search-section'
-            ];
-
-            const isSafeElement = safeElements.some(selector => 
-                e.target.matches(selector) || e.target.closest(selector)
-            );
-
-            // 🔥 ЕСЛИ КЛИК ПО САМОЙ ПАНЕЛИ (ПУСТОЙ ОБЛАСТИ) - НЕ ЗАКРЫВАЕМ
-            const isPanelClick = e.target === usersPanel || 
-                               (e.target.classList && e.target.classList.contains('users-panel'));
-
-            // 🔥 ЗАКРЫВАЕМ ТОЛЬКО ЕСЛИ КЛИК НЕ ПО БЕЗОПАСНЫМ ЭЛЕМЕНТАМ И НЕ ПО ПАНЕЛИ
-            if (!isSafeElement && !isPanelClick) {
-                console.log('✅ Клик вне панели - закрытие');
-                closeFullscreenPanel();
-            } else if (isPanelClick) {
-                console.log('🔒 Клик по пустой области панели - не закрываем');
-                // Ничего не делаем - не закрываем панель
-            }
-        }
-    });
-
-    // 🔥 ЗАКРЫТИЕ ПРИ ESC
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && isPanelOpen) {
-            console.log('✅ Escape - закрытие панели');
+            console.log('✅ Клик на чат - закрытие панели');
             closeFullscreenPanel();
         }
     });
 
-    // 🔥 ОБРАБОТКА ИЗМЕНЕНИЯ РАЗМЕРА ОКНА
-    window.addEventListener('resize', () => {
-        if (window.innerWidth > 768 && isPanelOpen) {
-            console.log('✅ Изменение размера на десктоп - закрытие панели');
-            closeFullscreenPanel();
-        }
-    });
+    // 🔥 УБИРАЕМ ВСЕ ДРУГИЕ ОБРАБОТЧИКИ ЗАКРЫТИЯ
+    // НИКАКИХ document.addEventListener для закрытия!
 
-    console.log("✅ Мобильное меню инициализировано - панель не закрывается при клике внутри");
+    console.log("✅ Мобильное меню инициализировано - закрывается только по крестику или чату");
 }
 
 // Обновите обработчик изменения размера окна

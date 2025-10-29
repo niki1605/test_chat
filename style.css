@@ -161,7 +161,7 @@ button:disabled {
     background-color: #f0f0f0;
 }
 
-/* 🔥 СТИЛИ HEADER */
+/* СТИЛИ HEADER */
 .header {
     display: flex;
     justify-content: space-between;
@@ -181,7 +181,18 @@ button:disabled {
     flex: 1;
 }
 
-/* 🔥 СТИЛИ MENU-TOGGLE В HEADER - ТЕПЕРЬ ПЕРВЫЙ */
+/* ЛОГОТИП - ПЕРВЫЙ */
+.app-logo {
+    order: 0;
+}
+
+.app-logo .logo-text {
+    font-weight: bold;
+    font-size: 18px;
+    color: #2575fc;
+}
+
+/* СТИЛИ MENU-TOGGLE - ВТОРОЙ */
 .menu-toggle {
     background: #2575fc !important;
     color: white !important;
@@ -196,6 +207,8 @@ button:disabled {
     width: 40px !important;
     height: 40px !important;
     margin-right: 10px !important;
+
+     margin-left: 45px !important;
     transition: all 0.3s ease !important;
     order: 1;
 }
@@ -213,21 +226,10 @@ button:disabled {
     transform: rotate(90deg) scale(1.05) !important;
 }
 
-/* 🔥 ЛОГОТИП - ТЕПЕРЬ ВТОРОЙ */
-.app-logo {
-    order: 0; /* 🔥 ЛОГОТИП ПЕРВЫЙ */
-}
-
-.app-logo .logo-text {
-    font-weight: bold;
-    font-size: 18px;
-    color: #2575fc;
-}
-
-/* 🔥 ИНФОРМАЦИЯ О ПОЛЬЗОВАТЕЛЕ - ПЕРЕМЕЩАЕМ ВПРАВО */
+/* ИНФОРМАЦИЯ О ПОЛЬЗОВАТЕЛЕ - ВПРАВО */
 .user-info {
     order: 3;
-    margin-left: auto; /* 🔥 ВЫРАВНИВАЕМ ВПРАВО */
+    margin-left: auto;
     margin-right: 15px;
 }
 
@@ -237,7 +239,7 @@ button:disabled {
     color: #333;
 }
 
-/* 🔥 ДЕЙСТВИЯ В HEADER */
+/* ДЕЙСТВИЯ В HEADER */
 .header-actions {
     display: flex;
     align-items: center;
@@ -267,6 +269,7 @@ button:disabled {
     min-height: auto;
 }
 
+/* СТИЛИ ДЛЯ USERS-PANEL */
 .users-panel {
     background: white;
     padding: 15px;
@@ -327,6 +330,7 @@ button:disabled {
     flex-direction: column;
     height: 100%;
     grid-row: 2 / 4;
+    cursor: pointer; /* 🔥 ДЛЯ ЗАКРЫТИЯ ПАНЕЛИ */
 }
 
 .chat-header {
@@ -383,6 +387,21 @@ button:disabled {
     color: #333;
     margin-right: auto;
     border-bottom-left-radius: 4px;
+}
+
+/* 🔥 УЛУЧШЕНИЯ ДЛЯ КОНТЕКСТНОГО МЕНЮ НА МОБИЛЬНЫХ */
+.message-item.own {
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    -khtml-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+    cursor: pointer !important;
+    min-height: 60px !important;
+    padding: 15px !important;
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: pan-y !important;
 }
 
 .message-sender {
@@ -679,8 +698,19 @@ button:disabled {
     }
     
     .users-panel.active {
-        transform: translateX(0);
-        display: block;
+        position: fixed !important;
+        top: 60px !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: calc(100vh - 60px) !important;
+        background: white !important;
+        z-index: 1001 !important;
+        display: block !important;
+        overflow-y: auto !important;
+        padding: 20px !important;
+        transform: translateX(0) !important;
     }
     
     .chat-area {
@@ -740,6 +770,12 @@ button:disabled {
         pointer-events: all !important;
     }
     
+    /* 🔥 УВЕЛИЧИВАЕМ ОБЛАСТЬ КАСАНИЯ НА МОБИЛЬНЫХ */
+    .message-item.own {
+        min-height: 70px !important;
+        padding: 18px 15px !important;
+    }
+    
     .message-item {
         max-width: 90%;
         padding: 10px 12px;
@@ -749,17 +785,20 @@ button:disabled {
         font-size: 16px;
     }
     
-    /* Контекстное меню для мобильных */
+    /* 🔥 УЛУЧШАЕМ КОНТЕКСТНОЕ МЕНЮ ДЛЯ МОБИЛЬНЫХ */
     #message-context-menu {
-        min-width: 180px;
-        border-radius: 12px;
-        padding: 8px 0;
+        min-width: 200px !important;
+        border-radius: 12px !important;
+        padding: 10px 0 !important;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;
+        backdrop-filter: blur(20px) !important;
+        background: rgba(255, 255, 255, 0.95) !important;
     }
     
     .context-menu-item {
-        padding: 12px 16px;
-        font-size: 16px;
-        min-height: 44px;
+        padding: 15px 20px !important;
+        font-size: 16px !important;
+        min-height: 50px !important;
     }
 }
 
