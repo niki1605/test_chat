@@ -38,6 +38,9 @@ let emailTimerRemaining = null;
 // Добавьте в переменные состояния
 let isEditingMessage = false;
 
+
+
+
 // Переключение между вкладками
 loginTab.addEventListener('click', () => {
     loginTab.classList.add('active');
