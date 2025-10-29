@@ -848,105 +848,135 @@ function deleteMessage(messageId, chatId) {
 
 
 function initLongPressSimple() {
- console.log("🔄 Инициализация long press с существующими функциями...");
+      console.log("🔄 Инициализация long press для реальных смартфонов...");
     
     let pressTimer = null;
-    let currentMessageElement = null;
+    let currentMessage = null;
+    let isContextMenuOpen = false;
 
-    // 🔥 ОБРАБОТЧИК НАЧАЛА УДЕРЖАНИЯ
-    function handlePressStart(e) {
-        // Ищем сообщение
+    // 🔥 ФУНКЦИЯ ЗАКРЫТИЯ МЕНЮ ПРИ КЛИКЕ ВНЕ ЕГО
+    function handleClickOutside(e) {
+        const contextMenu = document.getElementById('message-context-menu');
+        if (!contextMenu || contextMenu.style.display !== 'block') return;
+        
+        // 🔥 ПРОВЕРЯЕМ, ЧТО КЛИК НЕ ПО МЕНЮ И НЕ ПО СООБЩЕНИЮ
+        if (!contextMenu.contains(e.target) && !e.target.closest('.message-item.own')) {
+            console.log("🚪 Клик вне меню - закрываем");
+            hideContextMenu();
+            isContextMenuOpen = false;
+        }
+    }
+
+    // 🔥 ПРОСТАЯ ФУНКЦИЯ ДЛЯ TOUCH НАЧАЛА
+    function handleTouchStart(e) {
         const messageElement = e.target.closest('.message-item.own');
         if (!messageElement || messageElement.classList.contains('deleted')) return;
-
-        currentMessageElement = messageElement;
-
-        // 🔥 ДЛЯ TOUCH - ПРЕДОТВРАЩАЕМ СТАНДАРТНОЕ ПОВЕДЕНИЕ
-        if (e.type === 'touchstart') {
-            e.preventDefault();
-        }
-
-        // Запускаем таймер
+        
+        currentMessage = messageElement;
+        
+        // 🔥 ВАЖНО: предотвращаем стандартное поведение
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log("👆 Touch start на сообщении");
+        
         pressTimer = setTimeout(() => {
-            // Получаем координаты
-            let clientX, clientY;
-            if (e.touches && e.touches[0]) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            }
-
-            // 🔥 ВЫЗЫВАЕМ СУЩЕСТВУЮЩУЮ ФУНКЦИЮ
-            showContextMenu(currentMessageElement, clientX, clientY);
+            console.log("⏰ Таймер сработал, показываем меню");
             
-            // Вибрация на мобильных
+            // Получаем координаты касания
+            const touch = e.touches[0];
+            const x = touch.clientX;
+            const y = touch.clientY;
+            
+            // 🔥 ВЫЗЫВАЕМ СУЩЕСТВУЮЩУЮ ФУНКЦИЮ
+            showContextMenu(messageElement, x, y);
+            isContextMenuOpen = true;
+            
+            // Вибрация
             if (navigator.vibrate) {
                 navigator.vibrate(50);
             }
+        }, 400); // 🔥 УКОРОТИЛИ ДО 400ms ДЛЯ СМАРТФОНОВ
+    }
+
+    // 🔥 ПРОСТАЯ ФУНКЦИЯ ДЛЯ TOUCH ОКОНЧАНИЯ
+    function handleTouchEnd(e) {
+        console.log("👆 Touch end");
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+        
+        // 🔥 ЕСЛИ МЕНЮ ОТКРЫТО, ПРЕДОТВРАЩАЕМ СТАНДАРТНЫЙ КЛИК
+        if (isContextMenuOpen) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        currentMessage = null;
+    }
+
+    // 🔥 ПРОСТАЯ ФУНКЦИЯ ДЛЯ TOUCH ДВИЖЕНИЯ
+    function handleTouchMove(e) {
+        if (pressTimer) {
+            console.log("🔄 Touch move - отменяем таймер");
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+    }
+
+    // 🔥 ПРОСТАЯ ФУНКЦИЯ ДЛЯ МЫШИ
+    function handleMouseDown(e) {
+        if (e.button !== 0) return;
+        
+        const messageElement = e.target.closest('.message-item.own');
+        if (!messageElement || messageElement.classList.contains('deleted')) return;
+
+        currentMessage = messageElement;
+        
+        pressTimer = setTimeout(() => {
+            showContextMenu(messageElement, e.clientX, e.clientY);
+            isContextMenuOpen = true;
         }, 500);
     }
 
-    // 🔥 ОБРАБОТЧИК ОКОНЧАНИЯ УДЕРЖАНИЯ
-    function handlePressEnd() {
+    function handleMouseUp() {
         if (pressTimer) {
             clearTimeout(pressTimer);
             pressTimer = null;
         }
+        currentMessage = null;
     }
 
-    // 🔥 ОБРАБОТЧИК ДВИЖЕНИЯ - ОТМЕНА ПРИ ДВИЖЕНИИ
-    function handlePressMove() {
-        if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-        }
-    }
-
-    // 🔥 ДОБАВЛЯЕМ ОБРАБОТЧИКИ
-    document.addEventListener('touchstart', handlePressStart, { passive: false });
-    document.addEventListener('touchend', handlePressEnd);
-    document.addEventListener('touchmove', handlePressMove, { passive: true });
-    document.addEventListener('touchcancel', handlePressEnd);
+    // 🔥 ДОБАВЛЯЕМ ОБРАБОТЧИКИ ПРЯМО К ДОКУМЕНТУ
+    document.addEventListener('touchstart', handleTouchStart, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchcancel', handleTouchEnd);
     
-    document.addEventListener('mousedown', function(e) {
-        if (e.button === 0) { // Левая кнопка мыши
-            handlePressStart(e);
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', function() {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
         }
     });
-    document.addEventListener('mouseup', handlePressEnd);
-    document.addEventListener('mousemove', handlePressMove);
 
-    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ МЕНЮ
-    document.addEventListener('click', function(e) {
-        const contextMenu = document.getElementById('message-context-menu');
-        if (contextMenu && contextMenu.style.display === 'block' &&
-            !contextMenu.contains(e.target) &&
-            !e.target.closest('.message-item.own')) {
-            hideContextMenu();
-        }
-    });
+    // 🔥 ОБРАБОТЧИК ЗАКРЫТИЯ ПРИ КЛИКЕ ВНЕ МЕНЮ
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
 
     // 🔥 ЗАКРЫТИЕ ПРИ СКРОЛЛЕ
     document.addEventListener('scroll', function() {
-        const contextMenu = document.getElementById('message-context-menu');
-        if (contextMenu && contextMenu.style.display === 'block') {
+        if (isContextMenuOpen) {
+            console.log("📜 Скролл - закрываем меню");
             hideContextMenu();
+            isContextMenuOpen = false;
         }
     });
 
-    // 🔥 ЗАКРЫТИЕ ПРИ ESC
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            const contextMenu = document.getElementById('message-context-menu');
-            if (contextMenu && contextMenu.style.display === 'block') {
-                hideContextMenu();
-            }
-        }
-    });
-
-    console.log("✅ Long press инициализирован");
+    console.log("✅ Long press обработчики добавлены с закрытием при клике вне меню");
 }
 
 
