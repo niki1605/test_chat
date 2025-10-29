@@ -324,14 +324,15 @@ button:disabled {
 
 /* Контейнер для ввода сообщения - улучшен для мобильных */
 .message-input-container {
-    padding: 15px;
-    background: #f8f9fa;
-    border-top: 1px solid #e0e0e0;
-    display: flex;
-    gap: 10px;
-    flex-shrink: 0;
-    align-items: center;
-    position: relative;
+  display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    background: #f8f9fa !important;
+    border-top: 1px solid #e0e0e0 !important;
+    padding: 12px !important;
+    gap: 10px !important;
+    z-index: 1000 !important;
 }
 
 .message-input-container input {
@@ -1559,11 +1560,6 @@ button:disabled {
     }
 }
 
-
-
-
-
-
 /* 🔥 iOS Safari специфичные стили */
 @supports (-webkit-touch-callout: none) {
     .users-panel.active {
@@ -1574,5 +1570,65 @@ button:disabled {
     
     .message-input-container {
         padding-bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+    }
+}
+
+
+
+#message-input {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex: 1 !important;
+    padding: 14px 16px !important;
+    border: 1px solid #ddd !important;
+    border-radius: 25px !important;
+    font-size: 16px !important;
+    background: white !important;
+}
+
+#send-message-btn {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 0.6 !important;
+    padding: 14px 20px !important;
+    background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 25px !important;
+    cursor: not-allowed !important;
+    transition: all 0.3s ease !important;
+}
+
+#send-message-btn:not(:disabled) {
+    opacity: 1 !important;
+    cursor: pointer !important;
+}
+
+/* 🔥 ДЛЯ СОСТОЯНИЯ "ВЫБЕРИТЕ ПОЛЬЗОВАТЕЛЯ" */
+.chat-area:not(.has-selected-user) #message-input {
+    background: #f8f9fa !important;
+    border-color: #e9ecef !important;
+    color: #6c757d !important;
+}
+
+/* 🔥 МОБИЛЬНАЯ ВЕРСИЯ */
+@media (max-width: 768px) {
+    .message-input-container {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 1004 !important;
+    }
+    
+    #message-input {
+        min-height: 50px !important;
+        font-size: 16px !important;
+    }
+    
+    #send-message-btn {
+        min-height: 50px !important;
+        min-width: 60px !important;
     }
 }

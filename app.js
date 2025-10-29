@@ -520,19 +520,25 @@ async function getLastMessage(otherUserId) {
 
 // Выбор пользователя для чата
 async function selectUserForChat(userId, userData) {
+    // 🔥 ПРОВЕРКА
+    if (!userId || !userData) {
+        console.error('❌ selectUserForChat: userId или userData не определены');
+        return;
+    }
+    
     // Сброс предыдущего выбора
     document.querySelectorAll('.user-item').forEach(item => {
         item.classList.remove('active');
     });
-    
+
     // Установка нового выбора
     const selectedItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
     if (selectedItem) {
         selectedItem.classList.add('active');
     }
-    
+
     selectedChatUser = { id: userId, ...userData };
-    
+
     // Обновление заголовка чата
     chatWithUser.innerHTML = `
         <div class="chat-header-info">
@@ -542,20 +548,80 @@ async function selectUserForChat(userId, userData) {
             </div>
         </div>
     `;
+
+    // 🔥 АКТИВИРУЕМ ПОЛЕ ВВОДА И КНОПКУ
+    const messageInput = document.getElementById('message-input');
+    const sendMessageBtn = document.getElementById('send-message-btn');
     
-    // Активация поля ввода сообщения
-    messageInput.disabled = false;
-    sendMessageBtn.disabled = false;
-    messageInput.focus();
-    
+    if (messageInput) {
+        messageInput.disabled = false;
+        messageInput.placeholder = 'Введите сообщение...';
+        messageInput.style.opacity = '1';
+        messageInput.focus();
+    }
+
+    if (sendMessageBtn) {
+        sendMessageBtn.disabled = false;
+        sendMessageBtn.style.opacity = '1';
+    }
+
     // Загрузка сообщений
     await loadMessages(userId);
-    
+
     // Помечаем сообщения как прочитанные
     await markMessagesAsRead(userId);
-    
+
     // Обновляем счетчик непрочитанных
     updateUnreadCount(userId, 0);
+}
+
+function ensureMessageInputVisible() {
+    const messageInputContainer = document.querySelector('.message-input-container');
+    const messageInput = document.getElementById('message-input');
+    const sendMessageBtn = document.getElementById('send-message-btn');
+    
+    if (messageInputContainer) {
+        messageInputContainer.style.cssText = `
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: relative !important;
+            background: #f8f9fa !important;
+            border-top: 1px solid #e0e0e0 !important;
+            padding: 12px !important;
+            gap: 10px !important;
+            z-index: 1000 !important;
+        `;
+    }
+    
+    if (messageInput) {
+        messageInput.style.cssText = `
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            flex: 1 !important;
+            padding: 14px 16px !important;
+            border: 1px solid #ddd !important;
+            border-radius: 25px !important;
+            font-size: 16px !important;
+        `;
+    }
+    
+    if (sendMessageBtn) {
+        sendMessageBtn.style.cssText = `
+            display: block !important;
+            visibility: visible !important;
+            opacity: 0.6 !important;
+            padding: 14px 20px !important;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 25px !important;
+            cursor: not-allowed !important;
+        `;
+    }
+    
+    console.log('✅ Поле ввода гарантированно видимо');
 }
 
 // Загрузка сообщений
@@ -782,203 +848,96 @@ function deleteMessage(messageId, chatId) {
 
 
 function initLongPressSimple() {
-      const contextMenu = document.getElementById('message-context-menu');
+            console.log("✅ Инициализация long press с существующими функциями");
     
-    // Создаем меню если не существует
-    if (!contextMenu) {
-        showContextMenu();
-        return;
-    }
-
     let pressTimer = null;
     let currentMessageElement = null;
 
-    // Функция показа контекстного меню
-    function showContextMenu(messageElement, x, y) {
-        // Проверяем что выбран чат
-        if (!selectedChatUser || !selectedChatUser.id) {
-            showTempMessage("Сначала выберите собеседника", "info");
-            return;
-        }
+    // 🔥 ОБРАБОТЧИК НАЧАЛА УДЕРЖАНИЯ
+    function handlePressStart(e) {
+        // Ищем сообщение
+        const messageElement = e.target.closest('.message-item.own');
+        if (!messageElement || messageElement.classList.contains('deleted')) return;
 
-        const messageId = messageElement.dataset.messageId;
-        const messageText = messageElement.querySelector('.message-text')?.textContent || '';
-        
-        // Сохраняем данные в меню
-        contextMenu.dataset.messageId = messageId;
-        contextMenu.dataset.messageText = messageText;
-        
-        // Позиционируем меню
-        positionContextMenu(x, y);
-        
-        // Показываем меню
-        contextMenu.style.display = 'block';
         currentMessageElement = messageElement;
-        
-        // Подсвечиваем сообщение
-        messageElement.style.backgroundColor = 'rgba(255, 235, 59, 0.3)';
-    }
 
-    // Функция позиционирования меню
-    function positionContextMenu(x, y) {
-        const menuWidth = 200;
-        const menuHeight = 120;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        // Корректируем позицию чтобы меню не выходило за границы экрана
-        let posX = x;
-        let posY = y;
-
-        if (x + menuWidth > viewportWidth) {
-            posX = viewportWidth - menuWidth - 10;
-        }
-        if (y + menuHeight > viewportHeight) {
-            posY = viewportHeight - menuHeight - 10;
-        }
-
-        contextMenu.style.left = posX + 'px';
-        contextMenu.style.top = posY + 'px';
-    }
-
-    // Функция скрытия меню
-    function hideContextMenu() {
-        if (contextMenu.style.display === 'block') {
-            contextMenu.style.display = 'none';
-            
-            // Убираем подсветку с сообщения
-            if (currentMessageElement) {
-                currentMessageElement.style.backgroundColor = '';
-                currentMessageElement = null;
-            }
-        }
-        
-        // Очищаем таймер
-        if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-        }
-    }
-
-    // Обработчик начала удержания
-    function handlePressStart(e, target) {
-        // Ищем элемент сообщения
-        const messageElement = target.closest('.message-item.own');
-        if (!messageElement) return;
-
-        // Проверяем что сообщение не удалено
-        if (messageElement.classList.contains('deleted')) return;
-
-        // Получаем координаты
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-        // Запускаем таймер для показа меню
+        // Запускаем таймер
         pressTimer = setTimeout(() => {
-            showContextMenu(messageElement, clientX, clientY);
-        }, 500); // 500ms для удержания
+            // 🔥 ВЫЗЫВАЕМ ВАШУ СУЩЕСТВУЮЩУЮ ФУНКЦИЮ
+            if (e.type === 'touchstart') {
+                // Для touch событий
+                const touch = e.touches[0];
+                showContextMenu(messageElement, touch.clientX, touch.clientY);
+            } else {
+                // Для mouse событий
+                showContextMenu(messageElement, e.clientX, e.clientY);
+            }
+        }, 500);
     }
 
-    // Обработчик окончания удержания
+    // 🔥 ОБРАБОТЧИК ОКОНЧАНИЯ УДЕРЖАНИЯ
     function handlePressEnd() {
         if (pressTimer) {
             clearTimeout(pressTimer);
             pressTimer = null;
         }
+        currentMessageElement = null;
     }
 
-    // Обработчики для touch устройств
-    document.addEventListener('touchstart', function(e) {
-        handlePressStart(e, e.target);
-    }, { passive: true });
-
-    document.addEventListener('touchend', handlePressEnd, { passive: true });
-    document.addEventListener('touchmove', handlePressEnd, { passive: true });
-    document.addEventListener('touchcancel', handlePressEnd, { passive: true });
-
-    // Обработчики для мыши
-    document.addEventListener('mousedown', function(e) {
-        if (e.button === 0) { // Левая кнопка мыши
-            handlePressStart(e, e.target);
+    // 🔥 ОБРАБОТЧИК ДВИЖЕНИЯ - ОТМЕНА ПРИ ДВИЖЕНИИ
+    function handlePressMove() {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
         }
-    });
+    }
 
-    document.addEventListener('mouseup', handlePressEnd);
-    document.addEventListener('mousemove', handlePressEnd);
+    // 🔥 ДОБАВЛЯЕМ ОБРАБОТЧИКИ НА ВСЕ СООБЩЕНИЯ
+    function attachEventListeners() {
+        document.addEventListener('mousedown', function(e) {
+            if (e.button === 0) { // Левая кнопка мыши
+                handlePressStart(e);
+            }
+        });
 
-    // Закрытие меню при клике вне его
+        document.addEventListener('mouseup', handlePressEnd);
+        document.addEventListener('mousemove', handlePressMove);
+
+        // Для смартфонов
+        document.addEventListener('touchstart', handlePressStart, { passive: true });
+        document.addEventListener('touchend', handlePressEnd, { passive: true });
+        document.addEventListener('touchmove', handlePressMove, { passive: true });
+        document.addEventListener('touchcancel', handlePressEnd, { passive: true });
+    }
+
+    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ МЕНЮ
     document.addEventListener('click', function(e) {
-        if (contextMenu.style.display === 'block' && 
+        const contextMenu = document.getElementById('message-context-menu');
+        if (contextMenu && contextMenu.style.display === 'block' &&
             !contextMenu.contains(e.target) &&
             !e.target.closest('.message-item.own')) {
+            // 🔥 ВЫЗЫВАЕМ ВАШУ ФУНКЦИЮ СКРЫТИЯ
             hideContextMenu();
         }
     });
 
-    // Закрытие меню при нажатии Escape
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && contextMenu.style.display === 'block') {
+    // 🔥 ЗАКРЫТИЕ ПРИ СКРОЛЛЕ
+    document.addEventListener('scroll', function() {
+        const contextMenu = document.getElementById('message-context-menu');
+        if (contextMenu && contextMenu.style.display === 'block') {
             hideContextMenu();
         }
     });
 
-    // Обработчик действий в контекстном меню
-    contextMenu.addEventListener('click', function(e) {
-        const menuItem = e.target.closest('.context-menu-item');
-        if (!menuItem) return;
-
-        const action = menuItem.dataset.action;
-        const messageId = contextMenu.dataset.messageId;
-        const messageText = contextMenu.dataset.messageText;
-
-        // Создаем chatId для действий
-        const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
-
-        switch (action) {
-            case 'edit':
-                editMessage(messageId, chatId, messageText);
-                break;
-            case 'copy':
-                copyMessageText(messageText);
-                break;
-            case 'delete':
-                deleteMessage(messageId, chatId);
-                break;
-        }
-
-        hideContextMenu();
-    });
-
-    console.log("✅ Контекстное меню инициализировано");
-}
-
-// Функция для показа временных сообщений
-function showTempMessage(text, type = "success") {
-    // Создаем элемент сообщения
-    const tempMsg = document.createElement('div');
-    tempMsg.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === "success" ? "#28a745" : type === "error" ? "#dc3545" : "#17a2b8"};
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        z-index: 10000;
-        font-size: 14px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        max-width: 300px;
-        word-wrap: break-word;
-    `;
-    tempMsg.textContent = text;
-    document.body.appendChild(tempMsg);
+    // 🔥 ЗАПУСКАЕМ
+    attachEventListeners();
     
-    // Автоматическое удаление через 3 секунды
-    setTimeout(() => {
-        if (document.body.contains(tempMsg)) {
-            document.body.removeChild(tempMsg);
-        }
-    }, 3000);
+    // 🔥 ПЕРИОДИЧЕСКИ ОБНОВЛЯЕМ ОБРАБОТЧИКИ ДЛЯ НОВЫХ СООБЩЕНИЙ
+    setInterval(() => {
+        // Можно добавить логику для новых сообщений если нужно
+    }, 2000);
+
+    console.log("✅ Long press инициализирован с вашими функциями");
 }
 
 // Показать контекстное меню
@@ -1068,7 +1027,7 @@ function initContextMenuHandlers() {
             } else if (action === 'copy') {
                 copyMessageText(messageText);
             } else if (action === 'delete') {
-                //deleteMessage(messageId, chatId);
+                deleteMessage(messageId, chatId);
             }
             
             hideContextMenu();
@@ -1521,6 +1480,35 @@ document.getElementById('user-search').addEventListener('input', (e) => {
     }
 });
 
+function showTempMessage(text, type = "success") {
+    // Создаем элемент сообщения
+    const tempMsg = document.createElement('div');
+    tempMsg.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === "success" ? "#28a745" : type === "error" ? "#dc3545" : "#17a2b8"};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 10000;
+        font-size: 14px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-width: 300px;
+        word-wrap: break-word;
+    `;
+    tempMsg.textContent = text;
+    document.body.appendChild(tempMsg);
+    
+    // Автоматическое удаление через 3 секунды
+    setTimeout(() => {
+        if (document.body.contains(tempMsg)) {
+            document.body.removeChild(tempMsg);
+        }
+    }, 3000);
+}
+
+
 // Добавление кнопки очистки поиска
 function addClearSearchButton() {
     const searchContainer = document.querySelector('.search-container');
@@ -1597,6 +1585,11 @@ auth.onAuthStateChanged((user) => {
 
                     // 🔥 СБРАСЫВАЕМ СОСТОЯНИЕ ЧАТА ПРИ КАЖДОМ ВХОДЕ
                     resetChatState();
+
+                    // 🔥 ГАРАНТИРУЕМ ВИДИМОСТЬ ПОЛЯ ВВОДА
+                    setTimeout(() => {
+                        ensureMessageInputVisible();
+                    }, 100);
 
                     initContextMenu();
                     initMobileMenu();
@@ -2546,15 +2539,18 @@ function resetChatState() {
         messagesContainer.innerHTML = '<div class="no-messages">Выберите пользователя для начала общения</div>';
     }
 
-    // Блокируем поле ввода
+    // 🔥 ВАЖНО: РАЗБЛОКИРУЕМ ПОЛЕ ВВОДА ДАЖЕ КОГДА НЕТ ВЫБРАННОГО ПОЛЬЗОВАТЕЛЯ
     if (messageInput) {
-        messageInput.disabled = true;
+        messageInput.disabled = false; // 🔥 РАЗБЛОКИРУЕМ
         messageInput.placeholder = 'Выберите пользователя для общения...';
         messageInput.value = '';
+        messageInput.style.opacity = '1'; // 🔥 ГАРАНТИРУЕМ ВИДИМОСТЬ
+        messageInput.style.visibility = 'visible';
     }
 
     if (sendMessageBtn) {
-        sendMessageBtn.disabled = true;
+        sendMessageBtn.disabled = true; // Кнопка отправки заблокирована
+        sendMessageBtn.style.opacity = '0.6'; // Но видима
     }
 
     // Сбрасываем выбранного пользователя
@@ -2571,7 +2567,7 @@ function resetChatState() {
         messagesListener = null;
     }
 
-    console.log("✅ Состояние чата сброшено");
+    console.log("✅ Состояние чата сброшено, поле ввода доступно");
 }
 
 const mobileStyles = `
