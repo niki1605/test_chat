@@ -444,7 +444,7 @@ button:disabled {
     }
     
     .users-panel.active {
-        max-height: 100vh;
+        max-height: 80vh;
         padding: 15px;
         border-bottom: 1px solid #e0e0e0;
     }
