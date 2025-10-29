@@ -2343,7 +2343,7 @@ async function sendEmailNow(messageId, chatId) {
 }
 
 function initMobileMenu() {
-           const menuToggle = document.querySelector('.menu-toggle');
+  const menuToggle = document.querySelector('.menu-toggle');
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
     const header = document.querySelector('.header');
@@ -2354,25 +2354,6 @@ function initMobileMenu() {
     }
 
     let isPanelOpen = false;
-
-    // 🔥 УСТАНАВЛИВАЕМ КНОПКУ В НУЖНОЕ МЕСТО В HEADER
-    menuToggle.style.cssText = `
-        position: relative !important;
-        background: #2575fc !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 6px !important;
-        padding: 8px 12px !important;
-        font-size: 16px !important;
-        cursor: pointer !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        width: 40px !important;
-        height: 40px !important;
-        margin: 0 10px !important;
-        transition: all 0.3s ease !important;
-    `;
 
     function openFullscreenPanel() {
         if (isPanelOpen) return;
@@ -2422,7 +2403,7 @@ function initMobileMenu() {
         console.log('✅ Панель закрыта');
     }
 
-    // 🔥 ОБРАБОТЧИК КЛИКА ПО КНОПКЕ
+    // 🔥 ОБРАБОТЧИК КЛИКА ПО КНОПКЕ МЕНЮ
     menuToggle.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -2434,9 +2415,10 @@ function initMobileMenu() {
         }
     });
 
-    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ПОЛЬЗОВАТЕЛЯ
+    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ПОЛЬЗОВАТЕЛЯ ИЗ СПИСКА
     document.addEventListener('click', (e) => {
         if (isPanelOpen && e.target.closest('.user-item')) {
+            console.log('✅ Выбор пользователя - закрытие панели');
             closeFullscreenPanel();
         }
     });
@@ -2444,24 +2426,44 @@ function initMobileMenu() {
     // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ИЗ РЕЗУЛЬТАТОВ ПОИСКА
     document.addEventListener('click', (e) => {
         if (isPanelOpen && e.target.closest('.search-result-item')) {
+            console.log('✅ Выбор из результатов поиска - закрытие панели');
             closeFullscreenPanel();
         }
     });
 
-    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ ПАНЕЛИ
+    // 🔥 ИСПРАВЛЕННОЕ ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ ПАНЕЛИ
     document.addEventListener('click', (e) => {
         if (isPanelOpen) {
-            const isSearchElement = e.target.closest('.search-container') || 
-                                   e.target.closest('#search-results') ||
-                                   e.target === document.getElementById('user-search') ||
-                                   e.target === document.getElementById('search-btn') ||
-                                   e.target === document.getElementById('clear-search');
-            
-            if (!usersPanel.contains(e.target) && 
-                e.target !== menuToggle && 
-                !menuToggle.contains(e.target) &&
-                !isSearchElement) {
+            // 🔥 СПИСОК ЭЛЕМЕНТОВ, КОТОРЫЕ НЕ ДОЛЖНЫ ЗАКРЫВАТЬ ПАНЕЛЬ
+            const safeElements = [
+                '.search-container',
+                '#user-search', 
+                '#search-btn',
+                '#clear-search',
+                '#search-results',
+                '.search-result-item',
+                '.users-panel',
+                '.menu-toggle',
+                '.user-item',
+                '.active-chats-section',
+                '.search-section'
+            ];
+
+            const isSafeElement = safeElements.some(selector => 
+                e.target.matches(selector) || e.target.closest(selector)
+            );
+
+            // 🔥 ЕСЛИ КЛИК ПО САМОЙ ПАНЕЛИ (ПУСТОЙ ОБЛАСТИ) - НЕ ЗАКРЫВАЕМ
+            const isPanelClick = e.target === usersPanel || 
+                               (e.target.classList && e.target.classList.contains('users-panel'));
+
+            // 🔥 ЗАКРЫВАЕМ ТОЛЬКО ЕСЛИ КЛИК НЕ ПО БЕЗОПАСНЫМ ЭЛЕМЕНТАМ И НЕ ПО ПАНЕЛИ
+            if (!isSafeElement && !isPanelClick) {
+                console.log('✅ Клик вне панели - закрытие');
                 closeFullscreenPanel();
+            } else if (isPanelClick) {
+                console.log('🔒 Клик по пустой области панели - не закрываем');
+                // Ничего не делаем - не закрываем панель
             }
         }
     });
@@ -2469,11 +2471,20 @@ function initMobileMenu() {
     // 🔥 ЗАКРЫТИЕ ПРИ ESC
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && isPanelOpen) {
+            console.log('✅ Escape - закрытие панели');
             closeFullscreenPanel();
         }
     });
 
-    console.log("✅ Мобильное меню инициализировано");
+    // 🔥 ОБРАБОТКА ИЗМЕНЕНИЯ РАЗМЕРА ОКНА
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768 && isPanelOpen) {
+            console.log('✅ Изменение размера на десктоп - закрытие панели');
+            closeFullscreenPanel();
+        }
+    });
+
+    console.log("✅ Мобильное меню инициализировано - панель не закрывается при клике внутри");
 }
 
 // Обновите обработчик изменения размера окна
