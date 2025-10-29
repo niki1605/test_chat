@@ -2303,11 +2303,10 @@ async function sendEmailNow(messageId, chatId) {
 }
 
 function initMobileMenu() {
-       const menuToggle = document.querySelector('.menu-toggle');
+           const menuToggle = document.querySelector('.menu-toggle');
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
     const header = document.querySelector('.header');
-    const userSearchInput = document.getElementById('user-search');
 
     if (!menuToggle || !usersPanel || !chatArea || !header) {
         console.error('❌ Элементы мобильного меню не найдены');
@@ -2316,18 +2315,32 @@ function initMobileMenu() {
 
     let isPanelOpen = false;
 
+    // 🔥 УСТАНАВЛИВАЕМ КНОПКУ В НУЖНОЕ МЕСТО В HEADER
+    menuToggle.style.cssText = `
+        position: relative !important;
+        background: #2575fc !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 6px !important;
+        padding: 8px 12px !important;
+        font-size: 16px !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 40px !important;
+        height: 40px !important;
+        margin: 0 10px !important;
+        transition: all 0.3s ease !important;
+    `;
+
     function openFullscreenPanel() {
         if (isPanelOpen) return;
         
         usersPanel.classList.add('active');
         menuToggle.classList.add('active');
         menuToggle.innerHTML = '✕';
-        menuToggle.style.position = 'fixed';
-        menuToggle.style.top = '15px';
-        menuToggle.style.left = '15px';
-        menuToggle.style.zIndex = '1002';
-        menuToggle.style.background = '#2575fc';
-        menuToggle.style.color = 'white';
+        menuToggle.style.background = '#ff416c';
         
         usersPanel.style.cssText = `
             position: fixed;
@@ -2358,11 +2371,7 @@ function initMobileMenu() {
         usersPanel.classList.remove('active');
         menuToggle.classList.remove('active');
         menuToggle.innerHTML = '☰';
-        menuToggle.style.position = '';
-        menuToggle.style.top = '';
-        menuToggle.style.left = '';
-        menuToggle.style.background = '';
-        menuToggle.style.color = '';
+        menuToggle.style.background = '#2575fc';
         
         usersPanel.style.cssText = '';
         header.style.zIndex = '';
@@ -2373,7 +2382,7 @@ function initMobileMenu() {
         console.log('✅ Панель закрыта');
     }
 
-    // 🔥 ОБРАБОТЧИК КЛИКА ПО КНОПКЕ МЕНЮ
+    // 🔥 ОБРАБОТЧИК КЛИКА ПО КНОПКЕ
     menuToggle.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -2385,143 +2394,75 @@ function initMobileMenu() {
         }
     });
 
-    // 🔥 ИСПРАВЛЕННОЕ ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ ПАНЕЛИ
+    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ПОЛЬЗОВАТЕЛЯ
+    document.addEventListener('click', (e) => {
+        if (isPanelOpen && e.target.closest('.user-item')) {
+            closeFullscreenPanel();
+        }
+    });
+
+    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ИЗ РЕЗУЛЬТАТОВ ПОИСКА
+    document.addEventListener('click', (e) => {
+        if (isPanelOpen && e.target.closest('.search-result-item')) {
+            closeFullscreenPanel();
+        }
+    });
+
+    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ ПАНЕЛИ
     document.addEventListener('click', (e) => {
         if (isPanelOpen) {
-            // 🔥 ИСКЛЮЧАЕМ ПОЛЕ ВВОДА ПОИСКА ИЗ ЗАКРЫТИЯ
-            const isSearchInput = e.target === userSearchInput || 
-                                 e.target.closest('#user-search') ||
-                                 e.target.closest('.search-container');
+            const isSearchElement = e.target.closest('.search-container') || 
+                                   e.target.closest('#search-results') ||
+                                   e.target === document.getElementById('user-search') ||
+                                   e.target === document.getElementById('search-btn') ||
+                                   e.target === document.getElementById('clear-search');
             
-            // 🔥 ИСКЛЮЧАЕМ КНОПКУ ПОИСКА
-            const isSearchButton = e.target.id === 'search-btn' || 
-                                  e.target.closest('#search-btn');
-            
-            // 🔥 ИСКЛЮЧАЕМ КНОПКУ ОЧИСТКИ ПОИСКА
-            const isClearButton = e.target.id === 'clear-search' || 
-                                 e.target.closest('#clear-search');
-            
-            // 🔥 ИСКЛЮЧАЕМ РЕЗУЛЬТАТЫ ПОИСКА
-            const isSearchResults = e.target.closest('#search-results');
-            
-            // 🔥 ЗАКРЫВАЕМ ТОЛЬКО ЕСЛИ КЛИК НЕ ПО ЭЛЕМЕНТАМ ПОИСКА
             if (!usersPanel.contains(e.target) && 
                 e.target !== menuToggle && 
                 !menuToggle.contains(e.target) &&
-                !isSearchInput &&
-                !isSearchButton &&
-                !isClearButton &&
-                !isSearchResults) {
+                !isSearchElement) {
                 closeFullscreenPanel();
             }
         }
     });
 
-    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ПОЛЬЗОВАТЕЛЯ ИЗ СПИСКА
-    document.addEventListener('click', (e) => {
-        if (isPanelOpen && e.target.closest('.user-item')) {
-            console.log('✅ Выбор пользователя - закрытие панели');
-            closeFullscreenPanel();
-        }
-    });
-
-    // 🔥 ЗАКРЫТИЕ ПРИ ВЫБОРЕ ПОЛЬЗОВАТЕЛЯ ИЗ РЕЗУЛЬТАТОВ ПОИСКА
-    document.addEventListener('click', (e) => {
-        if (isPanelOpen && e.target.closest('.search-result-item')) {
-            console.log('✅ Выбор из результатов поиска - закрытие панели');
-            closeFullscreenPanel();
-        }
-    });
-
-    // 🔥 ЗАКРЫТИЕ ПРИ НАЖАТИИ ESC
+    // 🔥 ЗАКРЫТИЕ ПРИ ESC
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && isPanelOpen) {
-            console.log('✅ Escape - закрытие панели');
             closeFullscreenPanel();
         }
     });
 
-    // 🔥 ОБРАБОТКА ФОКУСА НА ПОЛЕ ВВОДА - НЕ ЗАКРЫВАЕМ ПАНЕЛЬ
-    if (userSearchInput) {
-        userSearchInput.addEventListener('focus', () => {
-            console.log('🔍 Фокус на поле поиска - панель остается открытой');
-        });
-        
-        userSearchInput.addEventListener('click', (e) => {
-            e.stopPropagation(); // 🔥 ПРЕДОТВРАЩАЕМ ВСПЛЫТИЕ
-        });
-    }
-
-    // 🔥 ОБРАБОТКА КНОПКИ ПОИСКА - НЕ ЗАКРЫВАЕМ ПАНЕЛЬ
-    const searchBtn = document.getElementById('search-btn');
-    if (searchBtn) {
-        searchBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // 🔥 ПРЕДОТВРАЩАЕМ ВСПЛЫТИЕ
-        });
-    }
-
-    // 🔥 ОБРАБОТКА КНОПКИ ОЧИСТКИ - НЕ ЗАКРЫВАЕМ ПАНЕЛЬ
-    const clearBtn = document.getElementById('clear-search');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // 🔥 ПРЕДОТВРАЩАЕМ ВСПЛЫТИЕ
-        });
-    }
-
-    console.log("✅ Мобильное меню инициализировано с защитой поля поиска");
+    console.log("✅ Мобильное меню инициализировано");
 }
 
 // Обновите обработчик изменения размера окна
 function handleResize() {
-   const menuToggle = document.querySelector('.menu-toggle');
+    const menuToggle = document.querySelector('.menu-toggle');
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
-    const header = document.querySelector('.header');
-    const messageInputContainer = document.querySelector('.message-input-container');
 
     if (window.innerWidth > 768) {
-        // Десктоп - показываем обе панели
-        if (usersPanel) {
-            usersPanel.classList.add('active');
-            usersPanel.style.cssText = '';
-            usersPanel.style.display = 'block';
-        }
-        if (chatArea) {
-            chatArea.style.display = 'flex';
-            chatArea.style.opacity = '1';
-            chatArea.style.pointerEvents = '';
-        }
+        // Десктоп - скрываем кнопку
         if (menuToggle) {
             menuToggle.style.display = 'none';
         }
-        if (header) {
-            header.style.zIndex = '';
+        if (usersPanel) {
+            usersPanel.classList.add('active');
+            usersPanel.style.cssText = '';
         }
-        if (messageInputContainer) {
-            messageInputContainer.style.cssText = '';
+        if (chatArea) {
+            chatArea.style.display = 'flex';
         }
-        document.body.style.overflow = '';
     } else {
-        // Мобильные - скрываем панель пользователей
+        // Мобильные - показываем кнопку
         if (menuToggle) {
-            menuToggle.style.display = 'block';
-            menuToggle.innerHTML = '☰';
-            menuToggle.style.position = '';
-            menuToggle.style.zIndex = '';
+            menuToggle.style.display = 'flex';
         }
         if (usersPanel) {
             usersPanel.classList.remove('active');
             usersPanel.style.cssText = '';
         }
-        if (chatArea) {
-            chatArea.style.display = 'flex';
-            chatArea.style.opacity = '1';
-            chatArea.style.pointerEvents = '';
-        }
-        if (messageInputContainer) {
-            messageInputContainer.style.cssText = '';
-        }
-
     }
 }
 
