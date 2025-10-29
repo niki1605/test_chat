@@ -2328,62 +2328,99 @@ function initMobileMenu() {
     let isPanelOpen = false;
 
     // 🔥 ФУНКЦИЯ ОТКРЫТИЯ ПАНЕЛИ
-    function openFullscreenPanel() {
-        if (isPanelOpen) return;
-        
-        usersPanel.classList.add('active');
-        newMenuToggle.classList.add('active');
-        newMenuToggle.innerHTML = '✕';
-        newMenuToggle.style.position = 'fixed';
-        newMenuToggle.style.top = '15px';
-        newMenuToggle.style.left = '15px';
-        newMenuToggle.style.zIndex = '1002';
-        newMenuToggle.style.background = '#2575fc';
-        newMenuToggle.style.color = 'white';
-        
-        usersPanel.style.cssText = `
-            position: fixed;
-            top: 60px;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            width: 100vw;
-            height: calc(100vh - 60px);
-            background: white;
-            z-index: 1001;
-            display: block !important;
-            overflow-y: auto;
-            padding: 20px;
+function openFullscreenPanel() {
+    if (isPanelOpen) return;
+    
+    usersPanel.classList.add('active');
+    newMenuToggle.classList.add('active');
+    newMenuToggle.innerHTML = '✕';
+    newMenuToggle.style.position = 'fixed';
+    newMenuToggle.style.top = '15px';
+    newMenuToggle.style.left = '15px';
+    newMenuToggle.style.zIndex = '1002';
+    newMenuToggle.style.background = '#2575fc';
+    newMenuToggle.style.color = 'white';
+    
+    // 🔥 ПАНЕЛЬ НА ВЕСЬ ЭКРАН, НО ОСТАВЛЯЕМ МЕСТО ДЛЯ ПОЛЯ ВВОДА
+    usersPanel.style.cssText = `
+        position: fixed;
+        top: 60px; /* Header */
+        left: 0;
+        right: 0;
+        bottom: 80px; /* 🔥 МЕСТО ДЛЯ ПОЛЯ ВВОДА СООБЩЕНИЯ */
+        width: 100vw;
+        height: calc(100vh - 60px - 80px); /* 🔥 УЧИТЫВАЕМ ПОЛЕ ВВОДА */
+        background: white;
+        z-index: 1001;
+        display: block !important;
+        overflow-y: auto;
+        padding: 20px;
+        border-radius: 20px 20px 0 0;
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+    `;
+    
+    header.style.zIndex = '1003';
+    
+    // 🔥 НЕ СКРЫВАЕМ ЧАТ ПОЛНОСТЬЮ, А ДЕЛАЕМ ЕГО ПРОЗРАЧНЫМ
+    chatArea.style.opacity = '0.3';
+    chatArea.style.pointerEvents = 'none';
+    
+    // 🔥 ГАРАНТИРУЕМ ЧТО ПОЛЕ ВВОДА ВИДИМО И ДОСТУПНО
+    const messageInputContainer = document.querySelector('.message-input-container');
+    if (messageInputContainer) {
+        messageInputContainer.style.cssText = `
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            background: #f8f9fa !important;
+            padding: 12px !important;
+            border-top: 1px solid #e0e0e0 !important;
+            z-index: 1004 !important; /* 🔥 ВЫСОКИЙ Z-INDEX */
+            display: flex !important;
+            gap: 10px !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            pointer-events: all !important;
         `;
-        
-        header.style.zIndex = '1003';
-        chatArea.style.display = 'none';
-        document.body.style.overflow = 'hidden';
-        
-        isPanelOpen = true;
-        console.log('✅ Панель открыта');
     }
+    
+    document.body.style.overflow = 'hidden';
+    
+    isPanelOpen = true;
+    console.log('✅ Панель открыта, поле ввода видимо');
+}
 
     // 🔥 ФУНКЦИЯ ЗАКРЫТИЯ ПАНЕЛИ
     function closeFullscreenPanel() {
         if (!isPanelOpen) return;
-        
-        usersPanel.classList.remove('active');
-        newMenuToggle.classList.remove('active');
-        newMenuToggle.innerHTML = '☰';
-        newMenuToggle.style.position = '';
-        newMenuToggle.style.top = '';
-        newMenuToggle.style.left = '';
-        newMenuToggle.style.background = '';
-        newMenuToggle.style.color = '';
-        
-        usersPanel.style.cssText = '';
-        header.style.zIndex = '';
-        chatArea.style.display = 'flex';
-        document.body.style.overflow = '';
-        
-        isPanelOpen = false;
-        console.log('✅ Панель закрыта');
+    
+    usersPanel.classList.remove('active');
+    newMenuToggle.classList.remove('active');
+    newMenuToggle.innerHTML = '☰';
+    newMenuToggle.style.position = '';
+    newMenuToggle.style.top = '';
+    newMenuToggle.style.left = '';
+    newMenuToggle.style.background = '';
+    newMenuToggle.style.color = '';
+    
+    usersPanel.style.cssText = '';
+    header.style.zIndex = '';
+    
+    // 🔥 ВОССТАНАВЛИВАЕМ ЧАТ
+    chatArea.style.opacity = '1';
+    chatArea.style.pointerEvents = '';
+    
+    // 🔥 ВОССТАНАВЛИВАЕМ ПОЛЕ ВВОДА
+    const messageInputContainer = document.querySelector('.message-input-container');
+    if (messageInputContainer) {
+        messageInputContainer.style.cssText = '';
+    }
+    
+    document.body.style.overflow = '';
+    
+    isPanelOpen = false;
+    console.log('✅ Панель закрыта, поле ввода восстановлено');
     }
 
     // 🔥 ОБРАБОТЧИК КЛИКА ПО КНОПКЕ МЕНЮ
@@ -2445,6 +2482,7 @@ function handleResize() {
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
     const header = document.querySelector('.header');
+    const messageInputContainer = document.querySelector('.message-input-container');
 
     if (window.innerWidth > 768) {
         // Десктоп - показываем обе панели
@@ -2455,13 +2493,17 @@ function handleResize() {
         }
         if (chatArea) {
             chatArea.style.display = 'flex';
+            chatArea.style.opacity = '1';
+            chatArea.style.pointerEvents = '';
         }
         if (menuToggle) {
             menuToggle.style.display = 'none';
         }
         if (header) {
             header.style.zIndex = '';
-            header.style.position = '';
+        }
+        if (messageInputContainer) {
+            messageInputContainer.style.cssText = '';
         }
         document.body.style.overflow = '';
     } else {
@@ -2478,11 +2520,13 @@ function handleResize() {
         }
         if (chatArea) {
             chatArea.style.display = 'flex';
+            chatArea.style.opacity = '1';
+            chatArea.style.pointerEvents = '';
         }
-        if (header) {
-            header.style.zIndex = '';
-            header.style.position = '';
+        if (messageInputContainer) {
+            messageInputContainer.style.cssText = '';
         }
+
     }
 }
 
