@@ -1694,20 +1694,83 @@ button:disabled {
     
     /* Header для мобильных */
     .header {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        width: 100%;
-        z-index: 1100;
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         padding: 10px 15px;
+        background: white;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        z-index: 1003;
+        height: 60px;
     }
     
+    /* Левая часть - кнопки по вертикали */
     .header-left {
         display: flex;
-        gap: 10px;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+    }
+
+/* Кнопка меню */
+    .menu-toggle {
+        display: flex !important;
+        background: #2575fc;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: all 0.3s ease;
+        z-index: 1004;
+        align-items: center;
+        justify-content: center;
+        min-width: 40px;
+        min-height: 40px;
+    }
+        .user-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: #333;
+        margin-left: 5px;
+        }
+
+ /* Правая часть - кнопка выхода */
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+        change-name-btn {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 11px;
+        min-height: auto;
+        transition: all 0.3s ease;
     }
     
+    .change-name-btn:hover {
+        background: #5a6268;
+    }
+    
+    /* Кнопка выхода */
+    .logout-btn {
+        background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+        padding: 6px 10px;
+        font-size: 11px;
+        min-height: auto;
+        border-radius: 6px;
+    }
+        
     /* Область чата с отступом для header */
     .chat-area {
         margin-top: 60px;
@@ -1782,6 +1845,8 @@ button:disabled {
         min-height: 60px;
     }
 
+
+        
  .menu-toggle, .menu-toggle_active {
     background: #2575fc;
     color: white;
