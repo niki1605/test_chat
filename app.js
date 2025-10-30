@@ -13,6 +13,20 @@ const messageInput = document.getElementById('message-input');
 const sendMessageBtn = document.getElementById('send-message-btn');
 const chatWithUser = document.getElementById('chat-with-user');
 
+// Элементы DOM
+const welcomeScreen = document.getElementById('welcome-screen');
+const welcomeGreeting = document.getElementById('welcome-greeting');
+const welcomeUserName = document.getElementById('welcome-user-name');
+const startChatBtn = document.getElementById('start-chat-btn');
+const openProfileBtn = document.getElementById('open-profile-btn');
+const backToWelcomeBtn = document.getElementById('back-to-welcome');
+const profileModal = document.getElementById('profile-modal');
+const profileName = document.getElementById('profile-name');
+const profileEmail = document.getElementById('profile-email');
+const simpleUserName = document.getElementById('simple-user-name');
+
+
+
 // Переменные состояния
 let currentUser = null;
 let selectedChatUser = null;
@@ -29,6 +43,7 @@ let forgotPasswordModal = null;
 let changeNameModal = null;
 let longPressTimer;
 let longPressTarget = null;
+let isFirstLogin = true; // Новый флаг для первого входа
 
 
 let emailTimerPaused = false;
@@ -38,7 +53,84 @@ let emailTimerRemaining = null;
 // Добавьте в переменные состояния
 let isEditingMessage = false;
 
+// Обработчики кнопок приветственного экрана
+startChatBtn.addEventListener('click', hideWelcomeScreen);
 
+// Обработчики кнопок приветственного экрана
+startChatBtn.addEventListener('click', hideWelcomeScreen);
+
+openProfileBtn.addEventListener('click', () => {
+    showProfileModal();
+});
+
+// Кнопка "Назад к приветствию" в основном интерфейсе
+backToWelcomeBtn.addEventListener('click', () => {
+    welcomeScreen.style.display = 'flex';
+    mainApp.style.display = 'none';
+});
+
+// Обработчики для модального окна профиля
+document.getElementById('change-name-from-profile').addEventListener('click', () => {
+    profileModal.style.display = 'none';
+    // Показываем модальное окно изменения имени
+    setTimeout(() => {
+        document.getElementById('change-name-modal').style.display = 'block';
+    }, 300);
+});
+
+document.getElementById('logout-from-profile').addEventListener('click', () => {
+    auth.signOut();
+    profileModal.style.display = 'none';
+});
+
+// Закрытие модального окна профиля
+profileModal.querySelector('.close').addEventListener('click', () => {
+    profileModal.style.display = 'none';
+});
+
+window.addEventListener('click', (e) => {
+    if (e.target === profileModal) {
+        profileModal.style.display = 'none';
+    }
+});
+
+// Показать приветственный экран
+function showWelcomeScreen(user, isNewUser = false) {
+    const userName = user.name || 'Пользователь';
+    
+    // Устанавливаем приветствие
+    if (isNewUser) {
+        welcomeGreeting.textContent = 'Добро пожаловать!';
+        startChatBtn.textContent = 'Начать общение';
+    } else {
+        welcomeGreeting.textContent = 'С возвращением!';
+        startChatBtn.textContent = 'Продолжить общение';
+    }
+    
+    welcomeUserName.textContent = userName;
+    welcomeScreen.style.display = 'flex';
+    authSection.style.display = 'none';
+    mainApp.style.display = 'none';
+    
+    // Сохраняем в localStorage что пользователь уже видел приветствие
+    localStorage.setItem('hasSeenWelcome', 'true');
+}
+
+// Скрыть приветственный экран и показать основной интерфейс
+function hideWelcomeScreen() {
+    welcomeScreen.style.display = 'none';
+    mainApp.style.display = 'grid';
+    isFirstLogin = false;
+}
+
+// Показать профиль
+function showProfileModal() {
+    if (currentUser) {
+        profileName.textContent = currentUser.name || 'Не указано';
+        profileEmail.textContent = currentUser.email || 'Не указано';
+        profileModal.style.display = 'block';
+    }
+}
 
 
 // Переключение между вкладками
@@ -214,7 +306,7 @@ document.getElementById('loginForm').addEventListener('submit', (e) => {
             messageDiv.style.display = 'block';
         });
 });
-
+/*
 // Выход из системы
 logoutBtn.addEventListener('click', () => {
     if (currentUser) {
@@ -227,7 +319,7 @@ logoutBtn.addEventListener('click', () => {
     
     auth.signOut();
 });
-
+*/
 // Поиск пользователей
 function searchUsers(searchTerm) {
     const searchResults = document.getElementById('search-results');
@@ -627,17 +719,23 @@ function ensureMessageInputVisible() {
     console.log('✅ Поле ввода гарантированно видимо');
 }
 
+// Автоматическая прокрутка только если пользователь был внизу
+function smartScrollToBottom() {
+    if (isNearBottom()) {
+        scrollToBottom();
+    }
+}
+
 // Загрузка сообщений
 function loadMessages(otherUserId) {
-     // Остановка предыдущего слушателя
+   // Остановка предыдущего слушателя
     if (messagesListener) {
         messagesListener();
     }
-    
+
     messagesContainer.innerHTML = '<div class="no-messages">Загрузка сообщений...</div>';
-    
+
     const chatId = [currentUser.uid, otherUserId].sort().join('_');
-    
     messagesListener = db.collection('chats')
         .doc(chatId)
         .collection('messages')
@@ -649,15 +747,15 @@ function loadMessages(otherUserId) {
                 messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений</div>';
                 return;
             }
-            
-            // 🔥 Просто отображаем все сообщения - удаленных уже нет в базе!
+
             snapshot.forEach((doc) => {
                 const message = doc.data();
                 const messageId = doc.id;
                 displayMessage(message, messageId);
             });
             
-            scrollToBottom();
+            // Умная прокрутка к последнему сообщению
+            smartScrollToBottom();
         }, (error) => {
             console.error('Ошибка загрузки сообщений:', error);
             messagesContainer.innerHTML = '<div class="no-messages">Ошибка загрузки сообщений</div>';
@@ -719,10 +817,10 @@ function displayMessage(message, messageId) {
 // Отправка сообщения
 function sendMessage() {
      if (!selectedChatUser || !messageInput.value.trim()) return;
-   
+
     const messageText = messageInput.value.trim();
     const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
-    
+
     const messageData = {
         text: messageText,
         senderId: currentUser.uid,
@@ -735,7 +833,7 @@ function sendMessage() {
         deleted: false,
         edited: false
     };
-    
+
     db.collection('chats')
         .doc(chatId)
         .collection('messages')
@@ -743,27 +841,12 @@ function sendMessage() {
         .then((docRef) => {
             messageInput.value = '';
             
-            // 🔥 ЗАПУСКАЕМ уведомление с таймером
-            showEmailNotification(docRef.id, chatId);
-            
-            // Обновляем последнее сообщение в чате
-            db.collection('chats').doc(chatId).update({
-                lastMessage: messageText,
-                lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            // Помечаем как доставленное
+            // Прокрутка к новому сообщению
             setTimeout(() => {
-                db.collection('chats')
-                    .doc(chatId)
-                    .collection('messages')
-                    .doc(docRef.id)
-                    .update({
-                        delivered: true
-                    });
-            }, 1000);
+                scrollToBottom();
+            }, 100);
             
-            messageInput.focus();
+            // Остальной код...
         })
         .catch((error) => {
             console.error('Ошибка отправки сообщения:', error);
@@ -919,14 +1002,6 @@ function initLongPressSimple() {
         currentMessage = null;
     }
 
-    // 🔥 ПРОСТАЯ ФУНКЦИЯ ДЛЯ TOUCH ДВИЖЕНИЯ
-    function handleTouchMove(e) {
-        if (pressTimer) {
-            console.log("🔄 Touch move - отменяем таймер");
-            clearTimeout(pressTimer);
-            pressTimer = null;
-        }
-    }
 
     // 🔥 ПРОСТАЯ ФУНКЦИЯ ДЛЯ МЫШИ
     function handleMouseDown(e) {
@@ -954,8 +1029,6 @@ function initLongPressSimple() {
     // 🔥 ДОБАВЛЯЕМ ОБРАБОТЧИКИ ПРЯМО К ДОКУМЕНТУ
     document.addEventListener('touchstart', handleTouchStart, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
-    document.addEventListener('touchmove', handleTouchMove, { passive: true });
-    document.addEventListener('touchcancel', handleTouchEnd);
     
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
@@ -1488,8 +1561,30 @@ function updateUnreadCount(userId, count) {
 
 // Автоматическая прокрутка к последнему сообщению
 function scrollToBottom() {
+     const messagesContainer = document.getElementById('messages-container');
+    if (messagesContainer) {
+        // Небольшая задержка для гарантии что DOM обновлен
+        setTimeout(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 100);
+        
+        // Дополнительная проверка через немного времени
+        setTimeout(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 300);
+    }
+}
+
+// Функция для проверки находится ли пользователь внизу
+function isNearBottom() {
     const messagesContainer = document.getElementById('messages-container');
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    if (!messagesContainer) return true;
+    
+    const threshold = 100; // пикселей от нижнего края
+    const position = messagesContainer.scrollTop + messagesContainer.clientHeight;
+    const height = messagesContainer.scrollHeight;
+    
+    return height - position <= threshold;
 }
 
 // Обработчики событий
@@ -1626,33 +1721,22 @@ auth.onAuthStateChanged((user) => {
                         ...userData
                     };
 
-                    // 🔥 СБРАСЫВАЕМ СОСТОЯНИЕ ЧАТА ПРИ КАЖДОМ ВХОДЕ
-                    resetChatState();
-
-                    // 🔥 ГАРАНТИРУЕМ ВИДИМОСТЬ ПОЛЯ ВВОДА
-                    setTimeout(() => {
-                        ensureMessageInputVisible();
-                    }, 100);
-
-                    initContextMenu();
-                    initMobileMenu();
-                    initChangeNameModal();
-                    handleResize();
-
-                    // Слушаем изменения размера окна
-                    window.addEventListener('resize', handleResize);
-
-                    userNameSpan.textContent = userData.name;
-
-                    // Переключение на основной интерфейс
-                    authSection.style.display = 'none';
-                    mainApp.style.display = 'grid';
-
-                    // Загрузка активных чатов
-                    loadActiveChats();
-
-                    // Добавление кнопки очистки поиска
-                    addClearSearchButton();
+                     // Проверяем, новый ли это пользователь
+                const isNewUser = userData.createdAt && 
+                    (new Date() - userData.createdAt.toDate()) < 60000; // Меньше минуты
+                
+                // Показываем приветственный экран
+                showWelcomeScreen(currentUser, isNewUser);
+                
+                // Инициализируем остальные компоненты
+                initContextMenu();
+                initMobileMenu();
+                initChangeNameModal();
+                handleResize();
+                
+                // Загрузка активных чатов (но не показываем их сразу)
+                loadActiveChats();
+                addClearSearchButton();
 
                     // Обновление статуса онлайн
                     db.collection('users').doc(user.uid).update({
@@ -1722,21 +1806,18 @@ auth.onAuthStateChanged((user) => {
 
 // 🔥 НОВАЯ ФУНКЦИЯ ДЛЯ ОБРАБОТКИ ВЫХОДА
 function handleUserLogout() {
-    console.log('🔒 Выход из системы - очистка состояния...');
+   console.log('🔒 Выход из системы...');
     
-    // 🔥 ОСТАНАВЛИВАЕМ ВСЕ СЛУШАТЕЛИ
     stopAllListeners();
-    
-    // 🔥 СБРАСЫВАЕМ ВСЕ ПЕРЕМЕННЫЕ СОСТОЯНИЯ
     currentUser = null;
     selectedChatUser = null;
-    
-    // 🔥 СБРАСЫВАЕМ СОСТОЯНИЕ ИНТЕРФЕЙСА
     resetChatState();
     resetUIState();
     
-    // 🔥 ПЕРЕКЛЮЧАЕМ НА ФОРМЫ АВТОРИЗАЦИИ
-    switchToAuthForms();
+    // Показываем формы авторизации
+    welcomeScreen.style.display = 'none';
+    mainApp.style.display = 'none';
+    authSection.style.display = 'block';
 }
 
 // 🔥 ФУНКЦИЯ ОСТАНОВКИ ВСЕХ СЛУШАТЕЛЕЙ
@@ -2407,11 +2488,12 @@ async function sendEmailNow(messageId, chatId) {
 }
 
 function initMobileMenu() {
-     const menuToggle = document.querySelector('.menu-toggle');
+        const menuToggle = document.querySelector('.menu-toggle');
+    const menuToggleActive = document.querySelector('.menu-toggle_active');
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
 
-    if (!menuToggle || !usersPanel || !chatArea) {
+    if (!menuToggle || !menuToggleActive || !usersPanel || !chatArea) {
         console.error('❌ Элементы мобильного меню не найдены');
         return;
     }
@@ -2421,82 +2503,67 @@ function initMobileMenu() {
     function openFullscreenPanel() {
         if (isPanelOpen) return;
         
+        console.log('📱 Открытие мобильной панели');
+        
         usersPanel.classList.add('active');
-        menuToggle.classList.add('active');
-        menuToggle.innerHTML = '✕';
-        menuToggle.style.background = '#ff416c';
+        // Скрываем ☰ и показываем ✕
+        menuToggle.style.display = 'none';
+        menuToggleActive.style.display = 'flex';
         
-        // Крестик остается на том же месте
-        menuToggle.style.left = '15px';
-        menuToggle.style.top = '50%';
-        menuToggle.style.transform = 'translateY(-50%)';
+        // Добавляем затемнение чата
+        chatArea.classList.add('panel-open');
         
+        // Блокируем скролл body
         document.body.style.overflow = 'hidden';
+        
         isPanelOpen = true;
-        console.log('✅ Панель открыта');
     }
 
     function closeFullscreenPanel() {
         if (!isPanelOpen) return;
         
+        console.log('📱 Закрытие мобильной панели');
+        
         usersPanel.classList.remove('active');
-        menuToggle.classList.remove('active');
-        menuToggle.innerHTML = '☰';
-        menuToggle.style.background = '#2575fc';
+        // Скрываем ✕ и показываем ☰
+        menuToggleActive.style.display = 'none';
+        menuToggle.style.display = 'flex';
         
         // Убираем затемнение чата
         chatArea.classList.remove('panel-open');
         
+        // Разблокируем скролл body
         document.body.style.overflow = '';
+        
         isPanelOpen = false;
-        console.log('✅ Панель закрыта');
     }
 
-    // Обработчик клика по кнопке меню
+    // Обработчик клика по кнопке ☰
     menuToggle.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        
-        if (isPanelOpen) {
-            closeFullscreenPanel();
-        } else {
-            openFullscreenPanel();
-        }
+        openFullscreenPanel();
     });
 
-    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ НА ЧАТ
+    // Обработчик клика по кнопке ✕
+    menuToggleActive.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeFullscreenPanel();
+    });
+
+    // Закрытие при клике на затемненную область чата
     chatArea.addEventListener('click', (e) => {
-        if (isPanelOpen) {
-            console.log('✅ Клик на чат - закрытие панели');
+        if (isPanelOpen && e.target === chatArea) {
+            console.log('✅ Клик на затемненную область - закрытие панели');
             closeFullscreenPanel();
         }
     });
 
-    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ НА ОБЛАСТЬ СООБЩЕНИЙ (дополнительная защита)
-    const messagesContainer = document.getElementById('messages-container');
-    if (messagesContainer) {
-        messagesContainer.addEventListener('click', (e) => {
-            if (isPanelOpen) {
-                console.log('✅ Клик на сообщения - закрытие панели');
-                closeFullscreenPanel();
-            }
-        });
-    }
-
-    // 🔥 ЗАКРЫТИЕ ПРИ КЛИКЕ НА ПОЛЕ ВВОДА
+    // Закрытие при начале набора сообщения
     const messageInput = document.getElementById('message-input');
     if (messageInput) {
-        messageInput.addEventListener('click', (e) => {
-            if (isPanelOpen) {
-                console.log('✅ Клик на поле ввода - закрытие панели');
-                closeFullscreenPanel();
-            }
-        });
-    }
-
-    // 🔥 ЗАКРЫТИЕ ПРИ НАЧАЛЕ НАБОРА СООБЩЕНИЯ
-    if (messageInput) {
-        messageInput.addEventListener('focus', (e) => {
+        messageInput.addEventListener('focus', () => {
             if (isPanelOpen) {
                 console.log('✅ Фокус на поле ввода - закрытие панели');
                 closeFullscreenPanel();
@@ -2504,42 +2571,44 @@ function initMobileMenu() {
         });
     }
 
-    console.log("✅ Мобильное меню инициализировано - закрывается по крестику, чату и полю ввода");
+    // Закрытие при выборе пользователя из поиска
+    const searchResults = document.getElementById('search-results');
+    if (searchResults) {
+        searchResults.addEventListener('click', () => {
+            if (isPanelOpen) {
+                console.log('✅ Выбор пользователя из поиска - закрытие панели');
+                closeFullscreenPanel();
+            }
+        });
+    }
+
+    console.log("✅ Мобильное меню инициализировано - две кнопки ☰/✕");
 }
 
 // Также обновите функцию handleResize для корректной работы
 function handleResize() {
-    const menuToggle = document.querySelector('.menu-toggle');
+     const menuToggle = document.querySelector('.menu-toggle');
     const usersPanel = document.querySelector('.users-panel');
     const chatArea = document.querySelector('.chat-area');
-
+    
     if (window.innerWidth > 768) {
-        // Десктоп - скрываем кнопку и сбрасываем состояния
-        if (menuToggle) {
-            menuToggle.style.display = 'none';
-        }
+        // Десктоп - скрываем кнопку меню и показываем панель
+        if (menuToggle) menuToggle.style.display = 'none';
         if (usersPanel) {
             usersPanel.classList.remove('active');
-            usersPanel.style.cssText = '';
+            usersPanel.style.transform = 'none';
         }
-        if (chatArea) {
-            chatArea.classList.remove('panel-open');
-            chatArea.style.display = 'flex';
-        }
+        if (chatArea) chatArea.classList.remove('panel-open');
+        document.body.style.overflow = '';
     } else {
-        // Мобильные - показываем кнопку
-        if (menuToggle) {
-            menuToggle.style.display = 'flex';
-        }
-        if (usersPanel) {
-            usersPanel.classList.remove('active');
-            usersPanel.style.cssText = '';
-        }
-        if (chatArea) {
-            chatArea.classList.remove('panel-open');
-        }
+        // Мобильные - показываем кнопку меню
+        if (menuToggle) menuToggle.style.display = 'flex';
+        if (usersPanel) usersPanel.classList.remove('active');
     }
 }
+
+// Слушаем изменения размера окна
+window.addEventListener('resize', handleResize);
 
 function resetChatState() {
     const messagesContainer = document.getElementById('messages-container');
