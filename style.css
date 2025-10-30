@@ -5,6 +5,7 @@
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+
 body {
     background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
     min-height: 100vh;
@@ -292,13 +293,12 @@ button:disabled {
 /* Основной интерфейс приложения */
 .main-app {
     display: grid;
-    grid-template-columns: 350px 1fr; /* Слева список 350px, справа чат - все оставшееся */
+    grid-template-columns: 350px 1fr; /* Слева список 350px, справа чат - все оставшееся пространство */
     grid-template-rows: 60px 1fr; /* Header и основное содержание */
     height: 100%;
     gap: 1px;
     background-color: #f0f0f0;
 }
-
 /* Упрощенный header на всю ширину */
 .simple-header {
     display: flex;
@@ -366,8 +366,8 @@ button:disabled {
     display: flex;
     flex-direction: column;
     height: 100%;
+    grid-column: 1; /* Левая колонка */
 }
-
 .users-panel h3 {
     margin-bottom: 12px;
     color: #333;
@@ -513,12 +513,14 @@ button:disabled {
 
 /* Область чата (правая часть) */
 .chat-area {
-        background: white;
+    background: white;
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 0; /* Важно! */
+    grid-column: 2; /* Правая колонка */
+    height: calc(100vh - 60px);
 }
+
 
 .chat-header {
     padding: 12px 15px;
@@ -550,7 +552,7 @@ button:disabled {
 
 /* Контейнер сообщений */
 .messages-container {
-     flex: 1;
+flex: 1;
     padding: 15px;
     overflow-y: auto;
     background: #fafafa;
@@ -559,8 +561,12 @@ button:disabled {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    height: 1px; /* Важно для flex скролла */
-    overflow-anchor: auto;
+    height: calc(100% - 80px); /* Вычитаем высоту header чата и поля ввода */
+
+display: block; /* Убираем flex для правильного скролла */
+
+max-height: calc(100vh - 140px); /* Вычитаем высоту header и поля ввода */
+
 }
 
 /* Стили сообщений */
@@ -703,7 +709,7 @@ button:disabled {
 .modal {
     display: none;
     position: fixed;
-    z-index: 1000;
+    z-index: 5000;
     left: 0;
     top: 0;
     width: 100%;
@@ -722,6 +728,16 @@ button:disabled {
 }
 
 .close {
+    position: absolute;
+    right: 15px;
+    top: 10px;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #666;
+}
+
+.close2 {
     position: absolute;
     right: 15px;
     top: 10px;
@@ -772,6 +788,7 @@ button:disabled {
     cursor: pointer;
     font-size: 14px;
     transition: all 0.3s ease;
+    z-index: 500;
 }
 
 .profile-btn:not(.logout) {
@@ -936,15 +953,6 @@ button:disabled {
     transform: translateY(-1px);
 }
 
-.message-item.editing {
-    background: rgba(37, 117, 252, 0.1) !important;
-    border: 2px solid #2575fc !important;
-}
-
-.message-item.deleted {
-    background: #f8f9fa !important;
-    opacity: 0.6;
-}
 
 /* Email уведомление */
 .email-notification {
@@ -1135,6 +1143,17 @@ button:disabled {
     background: #5a6268 !important;
 }
 
+
+
+.message-input-container {
+    padding: 15px;
+    background: white;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-shrink: 0;
+}
 /* Адаптивность для мобильных */
 @media (max-width: 768px) {
     body {
@@ -1185,7 +1204,6 @@ button:disabled {
         cursor: pointer;
         font-size: 16px;
         transition: all 0.3s ease;
-        z-index: 1002;
         align-items: center;
         justify-content: center;
     }
@@ -1795,6 +1813,7 @@ button:disabled {
     justify-content: center;
     width: 40px;
     height: 40px;
+    z-index: 500;
 }
 
 .menu-toggle:hover, .menu-toggle_active:hover {
@@ -1803,17 +1822,92 @@ button:disabled {
 
 .menu-toggle_active {
     background: #ff416c;
-}
-
-/* Для мобильных устройств */
-@media (max-width: 768px) {
-    .menu-toggle, .menu-toggle_active {
+}  
+.menu-toggle, .menu-toggle_active {
         display: none; /* По умолчанию скрыты, показываются через JS */
     }
     
     .header-left {
         gap: 8px;
     }
-}
+
+
+        .header-left {
+        gap: 8px;
+    }
     
+    .header-actions-vertical {
+        gap: 3px;
+        margin-left: 5px;
+    }
+    
+    .header-actions-vertical .profile-btn,
+    .header-actions-vertical .change-name-btn,
+    .header-actions-vertical .logout-btn {
+        padding: 3px 6px;
+        font-size: 9px;
+        width: 50px;
+    }
+}
+/* Вертикальное расположение кнопок в header-left */
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex: 1;
+}
+
+/* Контейнер для вертикальных кнопок */
+.header-actions-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-left: 10px;
+}
+
+/* Стили для вертикальных кнопок */
+.header-actions-vertical .profile-btn,
+.header-actions-vertical .change-name-btn,
+.header-actions-vertical .logout-btn {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 10px;
+    transition: all 0.3s ease;
+    min-height: auto;
+    text-align: center;
+    white-space: nowrap;
+    width: 60px;
+    z-index: 500;
+}
+
+.header-actions-vertical .profile-btn {
+    background: #28a745;
+    color: white;
+}
+
+.header-actions-vertical .profile-btn:hover {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+.header-actions-vertical .change-name-btn {
+    background: #6c757d;
+    color: white;
+}
+
+.header-actions-vertical .change-name-btn:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+.header-actions-vertical .logout-btn {
+    background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+    color: white;
+}
+
+.header-actions-vertical .logout-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(255, 65, 108, 0.3);
 }

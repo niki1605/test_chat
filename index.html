@@ -145,7 +145,7 @@
         <!-- Модальное окно изменения имени -->
         <div id="change-name-modal" class="modal">
             <div class="modal-content">
-                <span class="close">&times;</span>
+                <span class="close2">&times;</span>
                 <h3>Изменение имени</h3>
                 <form id="change-name-form">
                     <div class="form-group">
@@ -158,72 +158,72 @@
             </div>
         </div>
 
-        <!-- Основной интерфейс после входа -->
-        <div class="main-app" id="main-app" style="display: none;">
-            <!-- Header -->
-            <div class="header">
-                <div class="header-left">
-                     <div class="app-logo">
-                        <span class="logo-text">SAS</span>
-                    </div>
-                    <button id="back-to-welcome" class="back-to-welcome">← Профиль</button>
-                   <button class="menu-toggle" style="display: none;">☰</button>
-                   <button class="menu-toggle_active" style="display: none;">✕</button>
-                   
-                    <div class="user-info">
-                        <span id="user-name"></span>
-                    </div>
-                </div>
-                
-             
-
-                <!-- Email уведомление -->
-                <div id="email-notification" class="email-notification" style="display: none;">
-                    <div class="notification-content">
-                        <span class="notification-icon">⏰</span>
-                        <div class="notification-text">
-                            <strong>Email уведомление запланировано</strong>
-                            <div class="notification-subtitle">Вы можете удалить сообщение в течение 40 секунд чтобы отменить отправку.</div>
-                        </div>
-                        <div class="notification-timer" id="email-timer">60</div>
-                    </div>
-                </div>
+       <!-- Основной интерфейс после входа -->
+<div class="main-app" id="main-app" style="display: none;">
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <!-- Кнопки меню -->
+            <button class="menu-toggle" style="display: none;">☰</button>
+            <button class="menu-toggle_active" style="display: none;">✕</button>
+            
+            <!-- Логотип и информация о пользователе -->
+            <div class="app-logo">
+                <span class="logo-text">SAS</span>
             </div>
-
-            <!-- Список пользователей -->
-            <div class="users-panel">
-                <div class="search-section">
-                    <h3>Поиск пользователей</h3>
-                    <div class="search-container">
-                        <input type="text" id="user-search" placeholder="Введите имя пользователя...">
-                        <button id="search-btn">Найти</button>
-                    </div>
-                    <div class="search-results" id="search-results"></div>
-                </div>
-                
-                <div class="active-chats-section">
-                    <h3>Активные чаты</h3>
-                    <div class="users-list" id="users-list"></div>
-                </div>
+            <div class="user-info">
+                <span id="user-name"></span>
             </div>
+            
+            
+            <!-- Только кнопка Профиль -->
+            <button id="profile-btn" class="profile-btn">Профиль</button>
+        </div>
 
-            <!-- Область чата -->
-            <div class="chat-area">
-                <div class="chat-header">
-                    <h3 id="chat-with-user">Выберите пользователя для общения</h3>
+        <div id="email-notification" class="email-notification" style="display: none;">
+            <div class="notification-content">
+                <span class="notification-icon">⏰</span>
+                <div class="notification-text">
+                    <strong>Email уведомление запланировано</strong>
+                    <div class="notification-subtitle">Вы можете удалить сообщение в течение 40 секунд чтобы отменить отправку.</div>
                 </div>
-                
-                <div class="messages-container" id="messages-container">
-                    <div class="no-messages">Выберите пользователя для начала общения</div>
-                </div>
-                
-                <div class="message-input-container">
-                    <input type="text" id="message-input" placeholder="Введите сообщение..." disabled>
-                    <button id="send-message-btn" disabled>Отправить</button>
-                </div>
+                <div class="notification-timer" id="email-timer">60</div>
             </div>
         </div>
     </div>
+
+    <!-- Остальной код без изменений -->
+    <div class="users-panel">
+        <div class="search-section">
+            <h3>Поиск пользователей</h3>
+            <div class="search-container">
+                <input type="text" id="user-search" placeholder="Введите имя пользователя...">
+                <button id="search-btn">Найти</button>
+            </div>
+            <div class="search-results" id="search-results"></div>
+        </div>
+        
+        <div class="active-chats-section">
+            <h3>Активные чаты</h3>
+            <div class="users-list" id="users-list"></div>
+        </div>
+    </div>
+
+    <div class="chat-area">
+        <div class="chat-header">
+            <h3 id="chat-with-user">Выберите пользователя для общения</h3>
+        </div>
+        
+        <div class="messages-container" id="messages-container">
+            <div class="no-messages">Выберите пользователя для начала общения</div>
+        </div>
+        
+        <div class="message-input-container">
+            <input type="text" id="message-input" placeholder="Введите сообщение..." disabled>
+            <button id="send-message-btn" disabled>Отправить</button>
+        </div>
+    </div>
+</div>
 
     <!-- Контекстное меню для сообщений -->
     <div id="message-context-menu" class="context-menu">

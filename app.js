@@ -19,12 +19,12 @@ const welcomeGreeting = document.getElementById('welcome-greeting');
 const welcomeUserName = document.getElementById('welcome-user-name');
 const startChatBtn = document.getElementById('start-chat-btn');
 const openProfileBtn = document.getElementById('open-profile-btn');
-const backToWelcomeBtn = document.getElementById('back-to-welcome');
+const backToWelcomeBtn = document.getElementById('profile-btn');
 const profileModal = document.getElementById('profile-modal');
 const profileName = document.getElementById('profile-name');
 const profileEmail = document.getElementById('profile-email');
 const simpleUserName = document.getElementById('simple-user-name');
-
+const profileNameEdit = document.getElementById('change-name-modal');
 
 
 // Переменные состояния
@@ -86,6 +86,10 @@ document.getElementById('logout-from-profile').addEventListener('click', () => {
 // Закрытие модального окна профиля
 profileModal.querySelector('.close').addEventListener('click', () => {
     profileModal.style.display = 'none';
+});
+// Закрытие модального окна профиля
+profileNameEdit.querySelector('.close2').addEventListener('click', () => {
+    profileNameEdit.style.display = 'none';
 });
 
 window.addEventListener('click', (e) => {
@@ -816,15 +820,37 @@ function displayMessage(message, messageId) {
 
 // Отправка сообщения
 function sendMessage() {
-     if (!selectedChatUser || !messageInput.value.trim()) return;
+       // Проверяем что все необходимое доступно
+    if (!selectedChatUser || !messageInput.value.trim()) {
+        console.error('❌ Не выбран пользователь или пустое сообщение');
+        return;
+    }
+
+    if (!currentUser) {
+        console.error('❌ Пользователь не авторизован');
+        showTempMessage('Ошибка: вы не авторизованы', 'error');
+        return;
+    }
 
     const messageText = messageInput.value.trim();
     const chatId = [currentUser.uid, selectedChatUser.id].sort().join('_');
 
+    console.log('📤 Отправка сообщения:', {
+        to: selectedChatUser.name,
+        text: messageText,
+        chatId: chatId
+    });
+
+    // Блокируем кнопку отправки на время отправки
+    const sendBtn = document.getElementById('send-message-btn');
+    const originalText = sendBtn.textContent;
+    sendBtn.disabled = true;
+    sendBtn.textContent = '⏳';
+
     const messageData = {
         text: messageText,
         senderId: currentUser.uid,
-        senderName: currentUser.displayName || currentUser.name,
+        senderName: currentUser.name || currentUser.displayName || 'Пользователь',
         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
         delivered: false,
         read: false,
@@ -839,17 +865,57 @@ function sendMessage() {
         .collection('messages')
         .add(messageData)
         .then((docRef) => {
+            console.log('✅ Сообщение отправлено, ID:', docRef.id);
+            
+            // Очищаем поле ввода
             messageInput.value = '';
+            
+            // Восстанавливаем кнопку
+            sendBtn.disabled = false;
+            sendBtn.textContent = originalText;
             
             // Прокрутка к новому сообщению
             setTimeout(() => {
                 scrollToBottom();
             }, 100);
             
-            // Остальной код...
+            // Запускаем таймер email уведомления
+            showEmailNotification(docRef.id, chatId);
+            
+            // Обновляем последнее сообщение в чате
+            db.collection('chats').doc(chatId).update({
+                lastMessage: messageText,
+                lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                console.log('✅ Last message updated');
+            }).catch(error => {
+                console.error('❌ Ошибка обновления last message:', error);
+            });
+
+            // Помечаем как доставленное через секунду
+            setTimeout(() => {
+                db.collection('chats')
+                    .doc(chatId)
+                    .collection('messages')
+                    .doc(docRef.id)
+                    .update({
+                        delivered: true
+                    }).then(() => {
+                        console.log('✅ Сообщение помечено как доставленное');
+                    }).catch(error => {
+                        console.error('❌ Ошибка пометки доставки:', error);
+                    });
+            }, 1000);
+
         })
         .catch((error) => {
-            console.error('Ошибка отправки сообщения:', error);
+            console.error('❌ Ошибка отправки сообщения:', error);
+            
+            // Восстанавливаем кнопку при ошибке
+            sendBtn.disabled = false;
+            sendBtn.textContent = originalText;
+            
+            showTempMessage('Ошибка отправки сообщения', 'error');
         });
 }
 
@@ -1032,12 +1098,6 @@ function initLongPressSimple() {
     
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('mousemove', function() {
-        if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-        }
-    });
 
     // 🔥 ОБРАБОТЧИК ЗАКРЫТИЯ ПРИ КЛИКЕ ВНЕ МЕНЮ
     document.addEventListener('click', handleClickOutside);
@@ -1149,97 +1209,123 @@ function initContextMenuHandlers() {
             hideContextMenu();
         }
     });
+
+    contextMenu.addEventListener('touchend', (e) => {
+        if (e.target.classList.contains('context-menu-item')) {
+            const action = e.target.dataset.action;
+            const messageId = contextMenu.dataset.messageId;
+            const chatId = contextMenu.dataset.chatId;
+            const messageText = contextMenu.dataset.messageText;
+            
+            if (action === 'edit') {
+                editMessage(messageId, chatId, messageText);
+            } else if (action === 'copy') {
+                copyMessageText(messageText);
+            } else if (action === 'delete') {
+                deleteMessage(messageId, chatId);
+            }
+            
+            hideContextMenu();
+        }
+    });
 }
 
 // Функция редактирования сообщения
 function editMessage(messageId, chatId, currentText) {
-       const messageElement = document.querySelector(`.message-item[data-message-id="${messageId}"]`);
-    if (!messageElement) return;
+      console.log("✏️ Начало редактирования сообщения:", { messageId, chatId, currentText });
     
-    // 🔥 УСТАНАВЛИВАЕМ ФЛАГ РЕДАКТИРОВАНИЯ
-    isEditingMessage = true;
-    console.log("изменение "+isEditingMessage);
-    
-    // 🔥 ПРИОСТАНАВЛИВАЕМ таймер email если редактируемое сообщение - это то, для которого запланирован email
-    if (currentEmailMessageId === messageId && currentEmailChatId === chatId) {
-        pauseEmailTimer();
+    const messageElement = document.querySelector(`.message-item[data-message-id="${messageId}"]`);
+    if (!messageElement) {
+        console.error('❌ Сообщение для редактирования не найдено');
+        return;
     }
-    
+
+    // Устанавливаем флаг редактирования
+    //isEditingMessage = true;
+    console.log("📝 Режим редактирования включен:", isEditingMessage);
+
     // Скрываем оригинальный текст
     const messageTextElement = messageElement.querySelector('.message-text');
     messageTextElement.style.display = 'none';
-    
+
     // Создаем контейнер для редактирования
     let editContainer = messageElement.querySelector('.message-edit-container');
-    
     if (!editContainer) {
         editContainer = document.createElement('div');
         editContainer.className = 'message-edit-container';
         messageElement.appendChild(editContainer);
     }
-    
+
     editContainer.innerHTML = `
         <input type="text" class="edit-input" value="${currentText}" maxlength="1000">
         <div class="edit-actions">
-            <button class="edit-btn edit-cancel">Отмена</button>
-            <button class="edit-btn edit-save">Сохранить</button>
+            <button class="edit-btn edit-cancel" type="button">Отмена</button>
+            <button class="edit-btn edit-save" type="button">Сохранить</button>
         </div>
     `;
-    
+
     editContainer.classList.add('active');
     messageElement.classList.add('editing');
-    
+
     // Фокус на поле ввода
     const editInput = editContainer.querySelector('.edit-input');
     editInput.focus();
     editInput.select();
-    
-    // Обработчики кнопок
+
+    // Обработчики кнопок - НЕ используем stopPropagation!
     const cancelBtn = editContainer.querySelector('.edit-cancel');
     const saveBtn = editContainer.querySelector('.edit-save');
-    
-    cancelBtn.addEventListener('click', () => {
+
+    cancelBtn.addEventListener('click', (e) => {
+        console.log("❌ Отмена редактирования");
+        // НЕ используем stopPropagation - позволяем событию всплывать
         cancelEdit(messageElement, messageTextElement, messageId, chatId);
     });
-    
-    saveBtn.addEventListener('click', () => {
+
+    saveBtn.addEventListener('click', (e) => {
+        console.log("💾 Сохранение редактирования");
+        // НЕ используем stopPropagation - позволяем событию всплывать
         saveMessageEdit(messageId, chatId, editInput.value, messageElement, messageTextElement);
     });
-    
-    // Сохранение по Enter, отмена по Escape
+
+    cancelBtn.addEventListener('touchend', (e) => {
+        console.log("❌ Отмена редактирования");
+        // НЕ используем stopPropagation - позволяем событию всплывать
+        cancelEdit(messageElement, messageTextElement, messageId, chatId);
+    });
+
+    saveBtn.addEventListener('touchend', (e) => {
+        console.log("💾 Сохранение редактирования");
+        // НЕ используем stopPropagation - позволяем событию всплывать
+        saveMessageEdit(messageId, chatId, editInput.value, messageElement, messageTextElement);
+    });
+/*
+    // Обработчики клавиш
     editInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
+            e.preventDefault();
             saveMessageEdit(messageId, chatId, editInput.value, messageElement, messageTextElement);
         } else if (e.key === 'Escape') {
+            e.preventDefault();
             cancelEdit(messageElement, messageTextElement, messageId, chatId);
         }
     });
-    
-    // Закрытие по клику вне области редактирования
-    const closeEditHandler = (e) => {
-        if (!editContainer.contains(e.target)) {
-            cancelEdit(messageElement, messageTextElement, messageId, chatId);
-            document.removeEventListener('click', closeEditHandler);
-        }
-    };
-    
-    setTimeout(() => {
-        document.addEventListener('click', closeEditHandler);
-    }, 100);
+*/
+    console.log("✅ Редактор сообщения открыт - кнопки должны работать");
 }
 
 // Отмена редактирования
 function cancelEdit(messageElement, messageTextElement, messageId, chatId) {
     const editContainer = messageElement.querySelector('.message-edit-container');
-    if (editContainer) {
+    
         editContainer.classList.remove('active');
         editContainer.innerHTML = '';
-    }
+    
     messageTextElement.style.display = 'block';
     messageElement.classList.remove('editing');
     
     // 🔥 СБРАСЫВАЕМ ФЛАГ РЕДАКТИРОВАНИЯ
-    isEditingMessage = false;
+   // isEditingMessage = false;
     
     // 🔥 УБИРАЕМ ОВЕРЛЕЙ (если используете его)
     const overlay = document.getElementById('edit-overlay');
@@ -1731,7 +1817,7 @@ auth.onAuthStateChanged((user) => {
                 // Инициализируем остальные компоненты
                 initContextMenu();
                 initMobileMenu();
-                initChangeNameModal();
+                //initChangeNameModal();
                 handleResize();
                 
                 // Загрузка активных чатов (но не показываем их сразу)
@@ -2275,6 +2361,7 @@ async function updateLastMessageInChat(chatId) {
 }
 
 // Функция инициализации модального окна изменения имени
+/*
 function initChangeNameModal() {
     const changeNameBtn = document.getElementById('change-name-btn');
     const changeNameModal = document.getElementById('change-name-modal');
@@ -2313,7 +2400,7 @@ function initChangeNameModal() {
     });
 
     console.log("✅ Модальное окно изменения имени инициализировано");
-}
+}*/
 
 let emailNotificationTimer = null;
 let currentEmailMessageId = null;
